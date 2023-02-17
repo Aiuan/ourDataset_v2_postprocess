@@ -246,7 +246,7 @@ class NMEAInfo(object):
 
 
 class VelodyneDecoder(object):
-    def __init__(self, config_path, pcap_path, output_path, frame_cut_degree=180):
+    def __init__(self, config_path, pcap_path, output_path, frame_cut_degree=180, num_skip_packets=0, recover=False):
         print('=' * 100)
         print('Initialization\n')
 
@@ -271,6 +271,18 @@ class VelodyneDecoder(object):
 
         self.f = open(self.pcap_path, 'rb')
         self.reader = enumerate(dpkt.pcap.Reader(self.f))
+
+        # skip packets
+        for _ in range(num_skip_packets):
+            next(self.reader)
+
+        # recover
+        self.recover = recover
+        if self.recover:
+            self.num_ignore_frame = 1
+        else:
+            self.num_ignore_frame = 0
+
         self.idx_packet = None
 
         self.toh = None
@@ -536,50 +548,54 @@ class VelodyneDecoder(object):
         )
         pcd_path = os.path.join(self.output_path, pcd_filename)
 
-        # x y z intensity idx_laser unix_timestamp
-        if pcd_file_type == 'npz':
-            np.savez(
-                pcd_path,
-                x=self.pts_frame['x'].values.astype('float32'),
-                y=self.pts_frame['y'].values.astype('float32'),
-                z=self.pts_frame['z'].values.astype('float32'),
-                intensity=self.pts_frame['intensity'].values.astype('uint8'),
-                idx_laser=self.pts_frame['idx_laser'].values.astype('uint8'),
-                unix_timestamp=self.pts_frame['unix_timestamp'].values.astype('float64')
-            )
-        elif pcd_file_type == 'bin':
-            pass
-        elif pcd_file_type == 'pcd':
-            pcd = pd.DataFrame({
-                'x': self.pts_frame['x'].values.astype('float32'),
-                'y': self.pts_frame['y'].values.astype('float32'),
-                'z': self.pts_frame['z'].values.astype('float32'),
-                'intensity': self.pts_frame['intensity'].values.astype('uint8'),
-                'idx_laser': self.pts_frame['idx_laser'].values.astype('uint8'),
-                'unix_timestamp': self.pts_frame['unix_timestamp'].values.astype('float64'),
-            })
+        if self.num_ignore_frame > 0:
+            log_YELLOW('    Skip generate {},save to {}'.format(pcd_filename, pcd_path))
+            self.num_ignore_frame -= 1
+        else:
+            # x y z intensity idx_laser unix_timestamp
+            if pcd_file_type == 'npz':
+                np.savez(
+                    pcd_path,
+                    x=self.pts_frame['x'].values.astype('float32'),
+                    y=self.pts_frame['y'].values.astype('float32'),
+                    z=self.pts_frame['z'].values.astype('float32'),
+                    intensity=self.pts_frame['intensity'].values.astype('uint8'),
+                    idx_laser=self.pts_frame['idx_laser'].values.astype('uint8'),
+                    unix_timestamp=self.pts_frame['unix_timestamp'].values.astype('float64')
+                )
+            elif pcd_file_type == 'bin':
+                pass
+            elif pcd_file_type == 'pcd':
+                pcd = pd.DataFrame({
+                    'x': self.pts_frame['x'].values.astype('float32'),
+                    'y': self.pts_frame['y'].values.astype('float32'),
+                    'z': self.pts_frame['z'].values.astype('float32'),
+                    'intensity': self.pts_frame['intensity'].values.astype('uint8'),
+                    'idx_laser': self.pts_frame['idx_laser'].values.astype('uint8'),
+                    'unix_timestamp': self.pts_frame['unix_timestamp'].values.astype('float64'),
+                })
 
-            pcd.to_csv(pcd_path, sep=' ', index=False, header=False)
-            with open(pcd_path, 'r') as f_pcd:
-                lines = f_pcd.readlines()
+                pcd.to_csv(pcd_path, sep=' ', index=False, header=False)
+                with open(pcd_path, 'r') as f_pcd:
+                    lines = f_pcd.readlines()
 
-            with open(pcd_path, 'w') as f_pcd:
-                f_pcd.write('VERSION .7\n')
-                f_pcd.write('FIELDS')
-                for col in pcd.columns.values:
-                    f_pcd.write(' {}'.format(col))
-                f_pcd.write('\n')
-                f_pcd.write('SIZE 4 4 4 1 1 8\n')
-                f_pcd.write('TYPE F F F U U F\n')
-                f_pcd.write('COUNT 1 1 1 1 1 1\n')
-                f_pcd.write('WIDTH {}\n'.format(len(pcd)))
-                f_pcd.write('HEIGHT 1\n')
-                f_pcd.write('VIEWPOINT 0 0 0 1 0 0 0\n')
-                f_pcd.write('POINTS {}\n'.format(len(pcd)))
-                f_pcd.write('DATA ascii\n')
-                f_pcd.writelines(lines)
+                with open(pcd_path, 'w') as f_pcd:
+                    f_pcd.write('VERSION .7\n')
+                    f_pcd.write('FIELDS')
+                    for col in pcd.columns.values:
+                        f_pcd.write(' {}'.format(col))
+                    f_pcd.write('\n')
+                    f_pcd.write('SIZE 4 4 4 1 1 8\n')
+                    f_pcd.write('TYPE F F F U U F\n')
+                    f_pcd.write('COUNT 1 1 1 1 1 1\n')
+                    f_pcd.write('WIDTH {}\n'.format(len(pcd)))
+                    f_pcd.write('HEIGHT 1\n')
+                    f_pcd.write('VIEWPOINT 0 0 0 1 0 0 0\n')
+                    f_pcd.write('POINTS {}\n'.format(len(pcd)))
+                    f_pcd.write('DATA ascii\n')
+                    f_pcd.writelines(lines)
 
-        log_GREEN('    Generate {},save to {}'.format(pcd_filename, pcd_path))
+            log_GREEN('    Generate {},save to {}'.format(pcd_filename, pcd_path))
 
         # new frame init
         self.pts_frame = None

@@ -5,7 +5,13 @@ def main():
     data_path = 'F:\\20221217\\VelodyneLidar\\lidardata_20221217_1718.pcap'
     output_path = 'F:\\20221217\\VelodyneLidar_pcd'
 
-    vd = VelodyneDecoder(config_path=config_path, pcap_path=data_path, output_path=output_path)
+    vd = VelodyneDecoder(
+        config_path=config_path,
+        pcap_path=data_path,
+        output_path=output_path,
+        num_skip_packets=5150000,
+        recover=True
+    )
 
     t_last = time.time()
     while 1:
