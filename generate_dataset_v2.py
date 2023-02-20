@@ -1,6 +1,6 @@
 import os
 import shutil
-import glob
+import json
 
 import numpy as np
 import pandas as pd
@@ -10,6 +10,16 @@ from MEMS.timestamp_selector import DataFolder as MDF
 from OCUliiRadar.timestamp_selector import DataFolder as ODF
 from TIRadar.timestamp_selector import DataFolder as TDF
 from VelodyneLidar.timestamp_selector import DataFolder as VDF
+from utils import *
+
+def read_json(json_path):
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    return data
+
+def save_dict_as_json(json_path, dict_data):
+    with open(json_path, 'w') as f:
+        json.dump(dict_data, f)
 
 def select_camera_by_TIRadar(root_Camera, root_TIRadar):
     tdf = TDF(root_TIRadar)
@@ -72,7 +82,7 @@ def select_VelodyneLidar_by_TIRadar(root_VelodyneLidar, root_TIRadar):
     return np.array(path_matched_list), np.array(error_list), np.array(ts_VelodyneLidar_list)
 
 def main():
-    root_TIRadar = 'F:\\20221217\\TIRadar_npz'
+    root_TIRadar = 'D:\TIRadar_npz'
     root_IRayCamera = 'F:\\20221217\\IRayCamera'
     root_LeopardCamera0 = 'F:\\20221217\\LeopardCamera0'
     root_LeopardCamera1 = 'F:\\20221217\\LeopardCamera1'
@@ -80,8 +90,9 @@ def main():
     root_MEMS = 'F:\\20221217\\MEMS_json'
     root_VelodyneLidar = 'F:\\20221217\\VelodyneLidar_pcd'
 
-    root_output = 'F:\\dataset_v2'
+    root_calibration = 'F:\\sensors_calibration_v2\\results\\zhoushan_20221217_20221221'
 
+    root_output = 'F:\\dataset_v2'
     if not os.path.exists(root_output):
         os.makedirs(root_output)
 
@@ -158,11 +169,106 @@ def main():
         continue_group[cut_point+1:] += 1
     df_legal.insert(loc=0, column='continue_group', value=continue_group)
 
-    for group_name, group_df in df_legal.groupby(['continue_group', 'TIRadar_group']):
-        print('done')
+    cnt_group_frames = []
+    info_group = dict()
+    for id_group, (group_name, group_df) in enumerate(df_legal.groupby(['continue_group', 'TIRadar_group'])):
+        cnt_group_frames.append(len(group_df))
+        info_group['group_{:>04d}'.format(id_group)] = group_df
+
+        # create dataset_v2
+        group_folder_name = '{}_group{:>04d}_{}_{}frames'.format(
+            group_name[1].split('_')[0],
+            id_group,
+            group_name[1].split('_')[2],
+            len(group_df)
+        )
+        group_folder_path = os.path.join(root_output, group_folder_name)
+        if not os.path.exists(group_folder_path):
+            os.makedirs(group_folder_path)
+
+        log_BLUE('='*100)
+        log_BLUE('{}'.format(group_folder_name))
+
+        for id_frame in range(len(group_df)):
+            group_frame_folder_name = 'frame{:>04d}'.format(id_frame)
+            group_frame_folder_path = os.path.join(group_folder_path, group_frame_folder_name)
+            if not os.path.exists(group_frame_folder_path):
+                os.makedirs(group_frame_folder_path)
+            log('>>>>({}/{}) {}'.format(id_frame+1, len(group_df), group_frame_folder_name))
+
+            # TIRadar
+            sensor = 'TIRadar'
+            tmp1 = read_json(os.path.join(root_calibration, 'TIRadar_to_IRayCamera_extrinsic.json'))
+            tmp2 = read_json(os.path.join(root_calibration, 'TIRadar_to_LeopardCamera0_extrinsic.json'))
+            tmp3 = read_json(os.path.join(root_calibration, 'TIRadar_to_LeopardCamera1_extrinsic.json'))
+            json_data = {
+                'TIRadar_to_IRayCamera_extrinsic': tmp1['RT'],
+                'TIRadar_to_LeopardCamera0_extrinsic': tmp2['RT'],
+                'TIRadar_to_LeopardCamera1_extrinsic': tmp3['RT'],
+            }
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+
+            # OCULiiRadar
+            sensor = 'OCULiiRadar'
+            tmp1 = read_json(os.path.join(root_calibration, 'OCULiiRadar_to_IRayCamera_extrinsic.json'))
+            tmp2 = read_json(os.path.join(root_calibration, 'OCULiiRadar_to_LeopardCamera0_extrinsic.json'))
+            tmp3 = read_json(os.path.join(root_calibration, 'OCULiiRadar_to_LeopardCamera1_extrinsic.json'))
+            json_data = {
+                'OCULiiRadar_to_IRayCamera_extrinsic': tmp1['RT'],
+                'OCULiiRadar_to_LeopardCamera0_extrinsic': tmp2['RT'],
+                'OCULiiRadar_to_LeopardCamera1_extrinsic': tmp3['RT'],
+            }
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+
+            # VelodyneLidar
+            sensor = 'VelodyneLidar'
+            tmp1 = read_json(os.path.join(root_calibration, 'VelodyneLidar_to_LeopardCamera0_extrinsic.json'))
+            tmp2 = read_json(os.path.join(root_calibration, 'VelodyneLidar_to_LeopardCamera1_extrinsic.json'))
+            json_data = {
+                'VelodyneLidar_to_LeopardCamera0_extrinsic': tmp1['RT'],
+                'VelodyneLidar_to_LeopardCamera1_extrinsic': tmp2['RT'],
+            }
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+
+            # IRayCamera
+            sensor = 'IRayCamera'
+            json_data = read_json(os.path.join(root_calibration, 'IRayCamera_intrinsic.json'))
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+
+            # LeopardCamera0
+            sensor = 'LeopardCamera0'
+            json_data = read_json(os.path.join(root_calibration, 'LeopardCamera0_intrinsic.json'))
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+
+            # LeopardCamera1
+            sensor = 'LeopardCamera1'
+            json_data = read_json(os.path.join(root_calibration, 'LeopardCamera1_intrinsic.json'))
+            tmp1 = read_json(os.path.join(root_calibration, 'LeopardCamera1_to_LeopardCamera0_extrinsic.json'))
+            json_data['LeopardCamera1_to_LeopardCamera0_extrinsic'] = tmp1['RT']
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+
 
 
     print('done')
+
+
+def generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data):
+    ts = group_df['{}_ts'.format(sensor)].iloc[id_frame]
+    file_path = group_df['{}_files_path'.format(sensor)].iloc[id_frame]
+    file_name = os.path.basename(file_path)
+    suffix = '.{}'.format(file_name.split('.')[-1])
+    sensor_path = os.path.join(group_frame_folder_path, sensor)
+    if not os.path.exists(sensor_path):
+        os.makedirs(sensor_path)
+
+    file_name_new = '{:.3f}{}'.format(ts, suffix)
+    file_path_new = os.path.join(sensor_path, file_name_new)
+    shutil.copy(file_path, file_path_new)
+
+    json_data['timestamp'] = file_name.replace(suffix, '')
+    json_path = os.path.join(sensor_path, file_name_new.replace(suffix, '.json'))
+    save_dict_as_json(json_path, json_data)
+    log_GREEN('    generate {} folder completely '.format(sensor))
 
 
 if __name__ == '__main__':
