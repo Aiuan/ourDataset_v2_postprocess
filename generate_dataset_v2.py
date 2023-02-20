@@ -247,10 +247,26 @@ def main():
             json_data['LeopardCamera1_to_LeopardCamera0_extrinsic'] = tmp1['RT']
             generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
 
+            # MEMS
+            sensor = 'MEMS'
+            ts = group_df['{}_ts'.format(sensor)].iloc[id_frame]
+            file_path = group_df['{}_files_path'.format(sensor)].iloc[id_frame]
+            file_name = os.path.basename(file_path)
+            suffix = '.{}'.format(file_name.split('.')[-1])
+            sensor_path = os.path.join(group_frame_folder_path, sensor)
+            if not os.path.exists(sensor_path):
+                os.makedirs(sensor_path)
+            # read json
+            json_data = read_json(file_path)
+            json_data['timestamp'] = file_name.replace(suffix, '')
+            # save json
+            file_name_new = '{:.3f}{}'.format(ts, suffix)
+            file_path_new = os.path.join(sensor_path, file_name_new)
+            save_dict_as_json(file_path_new, json_data)
+
 
 
     print('done')
-
 
 def generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data):
     ts = group_df['{}_ts'.format(sensor)].iloc[id_frame]
