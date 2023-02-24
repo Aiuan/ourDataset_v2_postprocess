@@ -208,6 +208,13 @@ class NMEAInfo(object):
         feilds = nmea_str.split(',')
         self.format_id = feilds[0]
 
+        # just for lidardata_20221219_2105.pcap
+        # abnormal nmea: '$GPRMC,123331.00A,2959.9839833,N,12209.6733931,E,12.869,117.9,191222,0.0,E,D*06'
+        # normal nmea: '$GPRMC,123331.00,A,2959.9839833,N,12209.6733931,E,12.869,117.9,191222,0.0,E,D*06'
+        if 'A' in feilds[1]:
+            feilds[1] = feilds[1].replace('A', '')
+            feilds.insert(2, 'A')
+
         self.utc_hour = int(feilds[1][0:2])
         self.utc_minute = int(feilds[1][2:4])
         self.utc_second = int(feilds[1][4:6])
@@ -464,9 +471,9 @@ class VelodyneDecoder(object):
             log_GREEN('    toh_from_nmea = {}, toh_inside_clock = {}'.format(toh_from_nmea, toh_inside_clock))
         else:
             log_YELLOW('    toh_from_nmea = {}, toh_inside_clock = {}'.format(toh_from_nmea, toh_inside_clock))
-            key = input('Continue?(y/n)[y]')
-            if key == 'n' or key == 'N':
-                exit()
+            # key = input('Continue?(y/n)[y]')
+            # if key == 'n' or key == 'N':
+            #     exit()
 
         return is_delay_packet, time_offset
 
