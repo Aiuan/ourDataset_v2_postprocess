@@ -7,8 +7,11 @@ import numpy as np
 from utils import *
 
 class RecordData_NormalMode(object):
-    def __init__(self, path):
+    def __init__(self, path, skip_first_frame=True):
         self.root = path
+
+        self.skip_first_frame = skip_first_frame
+
         self.folder = os.path.basename(self.root)
         tmp = self.folder.split('_')
         self.time = tmp[0]+'_'+tmp[1]
@@ -50,17 +53,24 @@ class RecordData_NormalMode(object):
                 id_frame_global = id_frame_in_slice + n_frames_in_slices[:i].sum()
                 n_frames_global = self.mode_infos.numFrames
 
-                log('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}'.format(
-                    id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
-                    id_frame_global + 1, n_frames_global, id_frame_global
-                ))
+                if id_frame_in_slice == 0 and id_frame_in_slice == 0:
+                    log_YELLOW('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, skip'.format(
+                        id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
+                        id_frame_global + 1, n_frames_global, id_frame_global
+                    ))
+                    continue
+                else:
+                    log('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}'.format(
+                        id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
+                        id_frame_global + 1, n_frames_global, id_frame_global
+                    ))
 
                 # get current frame's timestamp
                 msec_add = self.mode_infos.framePeriodicity_msec * id_frame_global
                 timestamp = timestamp_add(self.triggertime, msec_add)
 
                 # judge: whether current frame is already generated?
-                output_path = os.path.join(output_folder, '{}.npz'.format(timestamp))
+                output_path = os.path.join(output_folder, '{}.adcdata.npz'.format(timestamp))
                 if os.path.exists(output_path):
                     log_YELLOW('  already generated {}'.format(output_path))
                     continue
@@ -98,7 +108,7 @@ class RecordData_NormalMode(object):
                 )
 
                 # save every frame: adcdata + mode_infos
-                output_path = os.path.join(output_folder, '{}.npz'.format(timestamp))
+                output_path = os.path.join(output_folder, '{}.adcdata.npz'.format(timestamp))
                 mode_infos_dict = dict(
                     [(attr, self.mode_infos.__getattribute__(attr))
                      for attr in dir(self.mode_infos) if not attr.startswith("__")]
@@ -196,8 +206,11 @@ def timestamp_add(ts_str, msec_add):
 
 
 class RecordData_MixMode(object):
-    def __init__(self, path):
+    def __init__(self, path, skip_first_frame=True):
         self.root = path
+
+        self.skip_first_frame = skip_first_frame
+
         self.folder = os.path.basename(self.root)
         tmp = self.folder.split('_')
         self.time = tmp[0]+'_'+tmp[1]
@@ -241,17 +254,24 @@ class RecordData_MixMode(object):
                 id_frame_global = id_frame_in_slice + n_frames_in_slices[:i].sum()
                 n_frames_global = self.mode_infos.numFrames
 
-                log('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}'.format(
-                    id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
-                    id_frame_global + 1, n_frames_global, id_frame_global
-                ))
+                if id_frame_in_slice == 0 and id_frame_in_slice == 0:
+                    log_YELLOW('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, skip'.format(
+                        id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
+                        id_frame_global + 1, n_frames_global, id_frame_global
+                    ))
+                    continue
+                else:
+                    log('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}'.format(
+                        id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
+                        id_frame_global + 1, n_frames_global, id_frame_global
+                    ))
 
                 # get current frame's timestamp
                 msec_add = self.mode_infos.framePeriodicity_msec * id_frame_global
                 timestamp = timestamp_add(self.triggertime, msec_add)
 
                 # judge: whether current frame is already generated?
-                output_path = os.path.join(output_folder, '{}.npz'.format(timestamp))
+                output_path = os.path.join(output_folder, '{}.adcdata.npz'.format(timestamp))
                 if os.path.exists(output_path):
                     log_YELLOW('  already generated {}'.format(output_path))
                     continue
@@ -301,7 +321,7 @@ class RecordData_MixMode(object):
                     )
 
                 # save every frame: adcdata + mode_infos
-                output_path = os.path.join(output_folder, '{}.npz'.format(timestamp))
+                output_path = os.path.join(output_folder, '{}.adcdata.npz'.format(timestamp))
                 mode_infos_dict = dict(
                     [(attr, self.mode_infos.__getattribute__(attr))
                      for attr in dir(self.mode_infos) if not attr.startswith("__")]
@@ -370,8 +390,8 @@ class ModeInfo_MixMode(object):
 
 
 def test_divide_frame():
-    root = 'F:\\20221217\\TIRadar'
-    output_root = 'F:\\20221217_process\\TIRadar'
+    root = 'F:'
+    output_root = 'F:\\TIRadar'
     folder = '20221217_165447_mode1_682'
 
     record_data = RecordData_NormalMode(os.path.join(root, folder))
@@ -396,8 +416,8 @@ def test_read():
         print('done')
 
 def test_divide_frame_mixmode():
-    root = 'F:\\20221217\\TIRadar'
-    output_root = 'F:\\20221217_process\\TIRadar'
+    root = 'F:'
+    output_root = 'F:\\TIRadar'
     folder = '20221217_170608_mixmode_20'
 
     record_data = RecordData_MixMode(os.path.join(root, folder))
@@ -425,6 +445,6 @@ if __name__ == '__main__':
     # test_divide_frame()
     # test_read()
 
-    # test_divide_frame_mixmode()
-    test_read_mixmode()
+    test_divide_frame_mixmode()
+    # test_read_mixmode()
 
