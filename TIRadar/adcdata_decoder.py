@@ -53,14 +53,14 @@ class RecordData_NormalMode(object):
                 id_frame_global = id_frame_in_slice + n_frames_in_slices[:i].sum()
                 n_frames_global = self.mode_infos.numFrames
 
-                if id_frame_in_slice == 0 and id_frame_in_slice == 0:
-                    log_YELLOW('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, skip'.format(
+                if self.skip_first_frame and id_frame_global == 0:
+                    log_YELLOW('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_global={:>3d}, skip'.format(
                         id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
                         id_frame_global + 1, n_frames_global, id_frame_global
                     ))
                     continue
                 else:
-                    log('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}'.format(
+                    log('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_global={:>3d}'.format(
                         id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
                         id_frame_global + 1, n_frames_global, id_frame_global
                     ))
@@ -174,10 +174,7 @@ def read_data_bin(data_bin_path, id_frame_in_slice, numSamplePerChirp, numChirpP
         f.seek(num_bytes_skip, 0)
         adc_data = f.read(Expected_Num_SamplesPerFrame * numBytesPerSample)
 
-    cache_path = './tmp_read_data_bin.bin'
-    np.array(adc_data).tofile(cache_path)
-    adc_data = np.fromfile(cache_path, dtype=np.int16)
-    os.remove(cache_path)
+    adc_data = np.frombuffer(adc_data, dtype=np.int16)
 
     real = adc_data[::2]
     real = real.reshape((numRXPerDevice, numSamplePerChirp, numChirpPerLoop, numLoops), order='F')
@@ -254,14 +251,14 @@ class RecordData_MixMode(object):
                 id_frame_global = id_frame_in_slice + n_frames_in_slices[:i].sum()
                 n_frames_global = self.mode_infos.numFrames
 
-                if id_frame_in_slice == 0 and id_frame_in_slice == 0:
-                    log_YELLOW('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, skip'.format(
+                if self.skip_first_frame and id_frame_global == 0:
+                    log_YELLOW('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_global={:>3d}, skip'.format(
                         id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
                         id_frame_global + 1, n_frames_global, id_frame_global
                     ))
                     continue
                 else:
-                    log('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}'.format(
+                    log('  ({:>3d}/{:>3d}) id_frame_in_slice={:>3d}, ({:>3d}/{:>3d}) id_frame_global={:>3d}'.format(
                         id_frame_in_slice + 1, n_frames_in_slice, id_frame_in_slice,
                         id_frame_global + 1, n_frames_global, id_frame_global
                     ))

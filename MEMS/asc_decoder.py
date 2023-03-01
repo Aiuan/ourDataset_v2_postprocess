@@ -48,9 +48,9 @@ class MsgIns(object):
 
         # decode fields
         self.ins_status = fields[0]
-        assert self.ins_status == 'INS_SOLUTION_GOOD'
+        # assert self.ins_status == 'INS_SOLUTION_GOOD'
         self.pos_type = fields[1]
-        assert self.pos_type == 'INS_RTKFIXED'
+        # assert self.pos_type == 'INS_RTKFIXED'
         self.latitude_N = float(fields[2])  # degrees
         self.longitude_E = float(fields[3])  # degrees
         self.height = float(fields[4])  # m
