@@ -7,6 +7,7 @@ ROOT = os.path.join(CURRENT_ROOT, '../')
 sys.path.append(ROOT)
 
 from TIRadar.adcdata_decoder import RecordData_NormalMode, RecordData_MixMode
+from utils import *
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -21,7 +22,18 @@ def main():
 
     root = args.data_path  # 'F:\\20221217\\TIRadar'
     output_root = '{}_npz'.format(root)  # 'F:\\20221217\\TIRadar_npz'
-    for item in os.listdir(root):
+    subfolders = os.listdir(root)
+    for i, item in enumerate(subfolders):
+        output_folder = os.path.join(output_root, item)
+        log('='*100)
+
+        if os.path.exists(output_folder):
+            files = os.listdir(output_folder)
+            if len(files) >= int(item.split('_')[-1]) - 2:
+                log_YELLOW('({}/{}) Already generated {}'.format(i+1, len(subfolders), output_folder))
+                continue
+
+        log_BLUE('({}/{}) Start generate {}'.format(i+1, len(subfolders), output_folder))
         if 'mixmode' in item:
             record_data = RecordData_MixMode(os.path.join(root, item))
         else:

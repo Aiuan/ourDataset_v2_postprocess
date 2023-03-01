@@ -172,9 +172,9 @@ def read_data_bin(data_bin_path, id_frame_in_slice, numSamplePerChirp, numChirpP
     num_bytes_skip = id_frame_in_slice * Expected_Num_SamplesPerFrame * numBytesPerSample
     with open(data_bin_path, 'rb') as f:
         f.seek(num_bytes_skip, 0)
-        adc_data = f.read(Expected_Num_SamplesPerFrame * numBytesPerSample)
+        adc_data_raw = f.read(Expected_Num_SamplesPerFrame * numBytesPerSample)
 
-    adc_data = np.frombuffer(adc_data, dtype=np.int16)
+    adc_data = np.frombuffer(adc_data_raw, dtype=np.int16)
 
     real = adc_data[::2]
     real = real.reshape((numRXPerDevice, numSamplePerChirp, numChirpPerLoop, numLoops), order='F')
