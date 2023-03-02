@@ -18,9 +18,9 @@ class DataFolder(object):
             group = np.array([subfolder for i in range(len(files))])
 
             if self.ts_str is None:
-                self.ts_str = np.char.replace(files, '.npz', '')
+                self.ts_str = np.char.replace(files, '.adcdata.npz', '')
             else:
-                self.ts_str = np.concatenate((self.ts_str, np.char.replace(files, '.npz', '')))
+                self.ts_str = np.concatenate((self.ts_str, np.char.replace(files, '.adcdata.npz', '')))
 
             if self.files_path is None:
                 self.files_path = files_path

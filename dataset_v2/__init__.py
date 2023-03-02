@@ -180,6 +180,10 @@ def undistort_image(image, intrinsic, radial_distortion, tangential_distortion):
 
     return image_undistort
 
+def save_dict_as_json(json_path, dict_data):
+    with open(json_path, 'w') as f:
+        json.dump(dict_data, f)
+
 
 if __name__ == '__main__':
     import glob
