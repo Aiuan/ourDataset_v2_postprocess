@@ -34,7 +34,15 @@ def main():
     ts_unique = np.unique(md.data['ts_unix'].values)
     for i in range(len(ts_unique)):
         ts_str = '{:.3f}'.format(ts_unique[i])
-        msg_imu, msg_ins, error, ts_str_MEMS = md.select_by_ts(ts_str)
+        try:
+            msg_imu, msg_ins, error, ts_str_MEMS = md.select_by_ts(ts_str)
+        except Exception as e:
+            log_YELLOW(repr(e))
+            if i == 0 or i == len(ts_unique)-1:
+                log_YELLOW('({}/{}) Skip'.format(i + 1, len(ts_unique)))
+                continue
+            else:
+                exit()
 
         path_save = os.path.join(output_path, '{}.json'.format(ts_str_MEMS))
 
