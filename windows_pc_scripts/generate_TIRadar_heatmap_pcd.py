@@ -1,5 +1,10 @@
 import glob
 import os
+import sys
+
+CURRENT_ROOT = os.path.dirname(os.path.abspath(sys.argv[0]))
+ROOT = os.path.join(CURRENT_ROOT, '../')
+sys.path.append(ROOT)
 
 import numpy as np
 import pandas as pd
@@ -23,7 +28,7 @@ def main():
         for id_frame, name_frame_folder in enumerate(names_frame_folder):
             log_BLUE('='*100)
             path_frame_folder = os.path.join(path_group_folder, name_frame_folder)
-            path_TIRadar_folder = os.path.join(path_frame_folder, 'TIRadar')
+            path_TIRadar_folder = os.path.join(path_frame_folder, '../TIRadar')
 
             TIRadar_json = load_json(glob.glob(os.path.join(path_TIRadar_folder, '*.json'))[0])
             timestamp_unix = TIRadar_json['timestamp']

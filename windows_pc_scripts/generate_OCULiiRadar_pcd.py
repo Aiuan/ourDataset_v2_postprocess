@@ -1,4 +1,10 @@
+import os
 import time
+import sys
+
+CURRENT_ROOT = os.path.dirname(os.path.abspath(sys.argv[0]))
+ROOT = os.path.join(CURRENT_ROOT, '../')
+sys.path.append(ROOT)
 
 from OCUliiRadar.decoder_np import OCULiiDecoderNetworkPackets
 

@@ -1,7 +1,14 @@
+import os
+import sys
+
+CURRENT_ROOT = os.path.dirname(os.path.abspath(sys.argv[0]))
+ROOT = os.path.join(CURRENT_ROOT, '../')
+sys.path.append(ROOT)
+
 from VelodyneLidar.decoder import *
 
 def main():
-    config_path = './VelodyneLidar/Alpha Prime.xml'
+    config_path = '../VelodyneLidar/Alpha Prime.xml'
     data_path = 'F:\\20221217\\VelodyneLidar\\lidardata_20221217_1718.pcap'
     output_path = 'F:\\20221217\\VelodyneLidar_pcd'
 

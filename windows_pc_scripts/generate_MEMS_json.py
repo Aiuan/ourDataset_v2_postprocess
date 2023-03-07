@@ -1,6 +1,11 @@
 import os
 import glob
 import json
+import sys
+
+CURRENT_ROOT = os.path.dirname(os.path.abspath(sys.argv[0]))
+ROOT = os.path.join(CURRENT_ROOT, '../')
+sys.path.append(ROOT)
 
 import numpy as np
 

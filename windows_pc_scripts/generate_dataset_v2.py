@@ -1,5 +1,10 @@
 import os
 import shutil
+import sys
+
+CURRENT_ROOT = os.path.dirname(os.path.abspath(sys.argv[0]))
+ROOT = os.path.join(CURRENT_ROOT, '../')
+sys.path.append(ROOT)
 
 import numpy as np
 import pandas as pd
