@@ -181,8 +181,9 @@ def undistort_image(image, intrinsic, radial_distortion, tangential_distortion):
     return image_undistort
 
 def save_dict_as_json(json_path, dict_data):
-    with open(json_path, 'w') as f:
-        json.dump(dict_data, f)
+    data = json.dumps(dict_data, sort_keys=True, indent=4)
+    with open(json_path, 'w', newline='\n') as f:
+        f.write(data)
 
 
 if __name__ == '__main__':

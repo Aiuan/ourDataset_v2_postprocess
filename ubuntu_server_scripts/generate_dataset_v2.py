@@ -18,6 +18,7 @@ from VelodyneLidar.timestamp_selector import DataFolder as VDF
 from utils import *
 from dataset_v2 import load_json, save_dict_as_json
 
+
 def select_camera_by_TIRadar(root_Camera, root_TIRadar):
     tdf = TDF(root_TIRadar)
     cdf = CDF(root_Camera)
@@ -78,15 +79,57 @@ def select_VelodyneLidar_by_TIRadar(root_VelodyneLidar, root_TIRadar):
 
     return np.array(path_matched_list), np.array(error_list), np.array(ts_VelodyneLidar_list)
 
+def add_calibres_to_dict(json_data, root_calibration, day, json_name, key=None):
+    if os.path.exists(root_calibration):
+        res_path = ''
+        if day in ['20221217', '20221219', '20221220', '20221221']:
+            res_path = os.path.join(root_calibration, 'code', 'zhoushan_20221217_20221221', 'results', json_name)
+        elif day in ['20221223', '20221224']:
+            res_path = os.path.join(root_calibration, 'code', 'yantai_20221223_20221226', 'results', json_name)
+        else:
+            log_YELLOW('Do not have calibration results for {}'.format(day))
+
+        if os.path.exists(res_path):
+            calib_res = load_json(res_path)
+            if key is not None:
+                if key in calib_res.keys():
+                    json_data[json_name.replace('.json', '')] = calib_res[key]
+                else:
+                    log_YELLOW('{} not in {}'.format(key, res_path))
+            else:
+                for item in calib_res.keys():
+                    json_data[item] = calib_res[item]
+    return json_data
+
+def generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, sensor_info):
+    ts = group_df['{}_ts'.format(sensor)].iloc[id_frame]
+    file_path = group_df['{}_files_path'.format(sensor)].iloc[id_frame]
+    file_name = os.path.basename(file_path)
+    suffix = '.{}'.format(file_name.split('.')[-1])
+    sensor_path = os.path.join(group_frame_folder_path, sensor)
+    if not os.path.exists(sensor_path):
+        os.makedirs(sensor_path)
+
+    file_name_new = '{:.3f}{}'.format(ts, suffix)
+    file_path_new = os.path.join(sensor_path, file_name_new)
+    shutil.copy(file_path, file_path_new)
+
+    sensor_info['timestamp'] = file_name.replace(suffix, '')
+    json_path = os.path.join(sensor_path, file_name_new.replace(suffix, '.json'))
+    save_dict_as_json(json_path, sensor_info)
+    log_GREEN('    generate {} folder completely '.format(sensor))
+
 def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data_path', type=str, help='exp path')
-    parser.add_argument('--calib_path', type=str, default=None, help='calibration results path')
+    parser.add_argument('--calib_path', type=str, default='/mnt/Dataset/sensors_calibration_v2', help='calibration results path')
     parser.add_argument('--output_path', type=str, default='/mnt/Dataset/ourDataset_v2', help='output path for dataset_v2')
+    parser.add_argument('--time_error_thred', type=float, default=0.05, help='abs min error between TIRadar and other sensors')
 
     args = parser.parse_args()
     return args
+
 
 def main():
     args = get_args()
@@ -154,25 +197,26 @@ def main():
         }
     )
 
-    error_thred = 0.05
+    error_thred = args.time_error_thred
+
+    # filter by time_error with TIRadar
     mask = np.logical_or(
         np.logical_or(
             np.logical_or(
                 np.logical_or(
                     np.logical_or(
-                        df['IRayCamera_error'].values > error_thred,
-                        df['LeopardCamera0_error'].values > error_thred,
+                        np.abs(df['IRayCamera_error'].values) > error_thred,
+                        np.abs(df['LeopardCamera0_error'].values) > error_thred,
                     ),
-                    df['LeopardCamera1_error'].values > error_thred,
+                    np.abs(df['LeopardCamera1_error'].values) > error_thred,
                 ),
-                df['MEMS_error'].values > error_thred,
+                np.abs(df['MEMS_error'].values) > error_thred,
             ),
-            df['OCULiiRadar_error'].values > error_thred,
+            np.abs(df['OCULiiRadar_error'].values) > error_thred,
         ),
-        df['VelodyneLidar_error'].values > error_thred,
+        np.abs(df['VelodyneLidar_error'].values) > error_thred,
     )
     # df_illegal = df[mask]
-
     df_legal = df[np.logical_not(mask)]
 
     # grouping
@@ -190,12 +234,9 @@ def main():
         info_group['group_{:>04d}'.format(id_group)] = group_df
 
         # create dataset_v2
-        group_folder_name = '{}_group{:>04d}_{}_{}frames'.format(
-            group_name[1].split('_')[0],
-            id_group,
-            group_name[1].split('_')[2],
-            len(group_df)
-        )
+        day = group_name[1].split('_')[0]
+        mode_name = group_name[1].split('_')[2]
+        group_folder_name = '{}_group{:>04d}_{}_{}frames'.format(day, id_group, mode_name, len(group_df))
         group_folder_path = os.path.join(root_output, group_folder_name)
         if not os.path.exists(group_folder_path):
             os.makedirs(group_folder_path)
@@ -212,72 +253,46 @@ def main():
 
             # TIRadar
             sensor = 'TIRadar'
-            if root_calibration is not None:
-                tmp1 = load_json(os.path.join(root_calibration, 'TIRadar_to_IRayCamera_extrinsic.json'))
-                tmp2 = load_json(os.path.join(root_calibration, 'TIRadar_to_LeopardCamera0_extrinsic.json'))
-                tmp3 = load_json(os.path.join(root_calibration, 'TIRadar_to_LeopardCamera1_extrinsic.json'))
-                json_data = {
-                    'TIRadar_to_IRayCamera_extrinsic': tmp1['RT'],
-                    'TIRadar_to_LeopardCamera0_extrinsic': tmp2['RT'],
-                    'TIRadar_to_LeopardCamera1_extrinsic': tmp3['RT'],
-                }
-            else:
-                json_data = {}
-            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+            sensor_info = {}
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'TIRadar_to_IRayCamera_extrinsic.json', 'RT')
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'TIRadar_to_LeopardCamera0_extrinsic.json', 'RT')
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'TIRadar_to_LeopardCamera1_extrinsic.json', 'RT')
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, sensor_info)
 
             # OCULiiRadar
             sensor = 'OCULiiRadar'
-            if root_calibration is not None:
-                tmp1 = load_json(os.path.join(root_calibration, 'OCULiiRadar_to_IRayCamera_extrinsic.json'))
-                tmp2 = load_json(os.path.join(root_calibration, 'OCULiiRadar_to_LeopardCamera0_extrinsic.json'))
-                tmp3 = load_json(os.path.join(root_calibration, 'OCULiiRadar_to_LeopardCamera1_extrinsic.json'))
-                json_data = {
-                    'OCULiiRadar_to_IRayCamera_extrinsic': tmp1['RT'],
-                    'OCULiiRadar_to_LeopardCamera0_extrinsic': tmp2['RT'],
-                    'OCULiiRadar_to_LeopardCamera1_extrinsic': tmp3['RT'],
-                }
-            else:
-                json_data = {}
-            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+            sensor_info = {}
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'OCULiiRadar_to_IRayCamera_extrinsic.json', 'RT')
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'OCULiiRadar_to_LeopardCamera0_extrinsic.json', 'RT')
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'OCULiiRadar_to_LeopardCamera1_extrinsic.json', 'RT')
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, sensor_info)
 
             # VelodyneLidar
             sensor = 'VelodyneLidar'
-            if root_calibration is not None:
-                tmp1 = load_json(os.path.join(root_calibration, 'VelodyneLidar_to_LeopardCamera0_extrinsic.json'))
-                tmp2 = load_json(os.path.join(root_calibration, 'VelodyneLidar_to_LeopardCamera1_extrinsic.json'))
-                json_data = {
-                    'VelodyneLidar_to_LeopardCamera0_extrinsic': tmp1['RT'],
-                    'VelodyneLidar_to_LeopardCamera1_extrinsic': tmp2['RT'],
-                }
-            else:
-                json_data = {}
-            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+            sensor_info = {}
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'VelodyneLidar_to_IRayCamera_extrinsic.json', 'RT')
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'VelodyneLidar_to_LeopardCamera0_extrinsic.json', 'RT')
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'VelodyneLidar_to_LeopardCamera1_extrinsic.json', 'RT')
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, sensor_info)
 
             # IRayCamera
             sensor = 'IRayCamera'
-            if root_calibration is not None:
-                json_data = load_json(os.path.join(root_calibration, 'IRayCamera_intrinsic.json'))
-            else:
-                json_data = {}
-            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+            sensor_info = {}
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'IRayCamera_intrinsic.json')
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, sensor_info)
 
             # LeopardCamera0
             sensor = 'LeopardCamera0'
-            if root_calibration is not None:
-                json_data = load_json(os.path.join(root_calibration, 'LeopardCamera0_intrinsic.json'))
-            else:
-                json_data = {}
-            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+            sensor_info = {}
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'LeopardCamera0_intrinsic.json')
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, sensor_info)
 
             # LeopardCamera1
             sensor = 'LeopardCamera1'
-            if root_calibration is not None:
-                json_data = load_json(os.path.join(root_calibration, 'LeopardCamera1_intrinsic.json'))
-                tmp1 = load_json(os.path.join(root_calibration, 'LeopardCamera1_to_LeopardCamera0_extrinsic.json'))
-                json_data['LeopardCamera1_to_LeopardCamera0_extrinsic'] = tmp1['RT']
-            else:
-                json_data = {}
-            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data)
+            sensor_info = {}
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'LeopardCamera1_intrinsic.json')
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'LeopardCamera1_to_LeopardCamera0_extrinsic.json', 'RT')
+            generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, sensor_info)
 
             # MEMS
             sensor = 'MEMS'
@@ -288,38 +303,18 @@ def main():
             sensor_path = os.path.join(group_frame_folder_path, sensor)
             if not os.path.exists(sensor_path):
                 os.makedirs(sensor_path)
-            # read json
-            json_data = load_json(file_path)
-            json_data['timestamp'] = file_name.replace(suffix, '')
-            if root_calibration is not None:
-                tmp1 = load_json(os.path.join(root_calibration, 'MEMS_to_Vehicle_extrinsic.json'))
-                tmp2 = load_json(os.path.join(root_calibration, 'MEMS_to_VelodyneLidar_extrinsic.json'))
-                json_data['MEMS_to_Vehicle_extrinsic'] = tmp1['RT']
-                json_data['MEMS_to_VelodyneLidar_extrinsic'] = tmp2['RT']
+            # read MEMS data in json
+            sensor_info = load_json(file_path)
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'MEMS_to_Vehicle_extrinsic.json', 'RT')
+            sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'MEMS_to_VelodyneLidar_extrinsic.json', 'RT')
+            sensor_info['timestamp'] = file_name.replace(suffix, '')
             # save json
             file_name_new = '{:.3f}{}'.format(ts, suffix)
             file_path_new = os.path.join(sensor_path, file_name_new)
-            save_dict_as_json(file_path_new, json_data)
+            save_dict_as_json(file_path_new, sensor_info)
+            log_GREEN('    generate {} folder completely '.format(sensor))
 
     print('done')
-
-def generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, json_data):
-    ts = group_df['{}_ts'.format(sensor)].iloc[id_frame]
-    file_path = group_df['{}_files_path'.format(sensor)].iloc[id_frame]
-    file_name = os.path.basename(file_path)
-    suffix = '.{}'.format(file_name.split('.')[-1])
-    sensor_path = os.path.join(group_frame_folder_path, sensor)
-    if not os.path.exists(sensor_path):
-        os.makedirs(sensor_path)
-
-    file_name_new = '{:.3f}{}'.format(ts, suffix)
-    file_path_new = os.path.join(sensor_path, file_name_new)
-    shutil.copy(file_path, file_path_new)
-
-    json_data['timestamp'] = file_name.replace(suffix, '')
-    json_path = os.path.join(sensor_path, file_name_new.replace(suffix, '.json'))
-    save_dict_as_json(json_path, json_data)
-    log_GREEN('    generate {} folder completely '.format(sensor))
 
 
 if __name__ == '__main__':
