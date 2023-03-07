@@ -126,6 +126,7 @@ def get_args():
     parser.add_argument('--calib_path', type=str, default='/mnt/Dataset/sensors_calibration_v2', help='calibration results path')
     parser.add_argument('--output_path', type=str, default='/mnt/Dataset/ourDataset_v2', help='output path for dataset_v2')
     parser.add_argument('--time_error_thred', type=float, default=0.05, help='abs min error between TIRadar and other sensors')
+    parser.add_argument('--min_cnt_frames', type=int, default=60, help='min number of frames in a group')
 
     args = parser.parse_args()
     return args
@@ -227,29 +228,42 @@ def main():
         continue_group[cut_point+1:] += 1
     df_legal.insert(loc=0, column='continue_group', value=continue_group)
 
+    min_cnt_frames = args.min_cnt_frames
     cnt_group_frames = []
     info_group = dict()
-    for id_group, (group_name, group_df) in enumerate(df_legal.groupby(['continue_group', 'TIRadar_group'])):
-        cnt_group_frames.append(len(group_df))
-        info_group['group_{:>04d}'.format(id_group)] = group_df
+    res_groupby = df_legal.groupby(['continue_group', 'TIRadar_group'])
+    for id_group, (group_name, group_df) in enumerate(res_groupby):
+        log('=' * 100)
 
-        # create dataset_v2
         day = group_name[1].split('_')[0]
         mode_name = group_name[1].split('_')[2]
         group_folder_name = '{}_group{:>04d}_{}_{}frames'.format(day, id_group, mode_name, len(group_df))
-        group_folder_path = os.path.join(root_output, group_folder_name)
-        if not os.path.exists(group_folder_path):
-            os.makedirs(group_folder_path)
 
-        log_BLUE('='*100)
-        log_BLUE('{}'.format(group_folder_name))
+        cnt_frames = len(group_df)
+        if cnt_frames < min_cnt_frames:
+            log_YELLOW('Skip {}, the number of frames is {}(<{})'.format(group_folder_name, cnt_frames, min_cnt_frames))
+            continue
+
+        cnt_group_frames.append(len(group_df))
+        info_group['group_{:>04d}'.format(id_group)] = group_df
+
+        group_folder_path = os.path.join(root_output, group_folder_name)
+        # create group_folder
+        if not os.path.exists(group_folder_path):
+            os.mkdir(group_folder_path)
+            log('create {}'.format(group_folder_path))
 
         for id_frame in range(len(group_df)):
             group_frame_folder_name = 'frame{:>04d}'.format(id_frame)
             group_frame_folder_path = os.path.join(group_folder_path, group_frame_folder_name)
             if not os.path.exists(group_frame_folder_path):
                 os.makedirs(group_frame_folder_path)
-            log('>>>>({}/{}) {}'.format(id_frame+1, len(group_df), group_frame_folder_name))
+            log(
+                '>>>> ({}/{}){} | ({}/{}){}'.format(
+                    id_group+1, res_groupby.ngroups, group_folder_name,
+                    id_frame+1, len(group_df), group_frame_folder_name
+                )
+            )
 
             # TIRadar
             sensor = 'TIRadar'
