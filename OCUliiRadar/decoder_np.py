@@ -366,16 +366,35 @@ class OCULiiDecoderNetworkPackets(object):
           eth = dpkt.ethernet.Ethernet(pkg)
 
           # check whether ip packet: to consider only ip packets
-          if eth.type != dpkt.ethernet.ETH_TYPE_IP:
-            print('[{:.6f}] idx_packet={}, not ip packet, skip'.format(ts, idx_packet))
+          if hasattr(eth, 'type'):
+            if eth.type != dpkt.ethernet.ETH_TYPE_IP:
+              print('[{:.6f}] idx_packet={}, not ip packet, skip'.format(ts, idx_packet))
+              continue
+          else:
+            print('[{:.6f}] idx_packet={}, no eth.type, skip'.format(ts, idx_packet))
             continue
 
           # check whether udp packet: to consider only udp packets
-          if eth.data.p != dpkt.ip.IP_PROTO_UDP:
-            print('[{:.6f}] idx_packet={}, not udp packet, skip'.format(ts, idx_packet))
+          if hasattr(eth, 'data'):
+            if hasattr(eth.data, 'p'):
+              if eth.data.p != dpkt.ip.IP_PROTO_UDP:
+                print('[{:.6f}] idx_packet={}, not udp packet, skip'.format(ts, idx_packet))
+                continue
+            else:
+              print('[{:.6f}] idx_packet={}, no eth.data.p, skip'.format(ts, idx_packet))
+              continue
+          else:
+            print('[{:.6f}] idx_packet={}, no eth.data, skip'.format(ts, idx_packet))
             continue
 
           # check whether ip address is legal
+          if not hasattr(eth.data, 'src'):
+            print('[{:.6f}] idx_packet={}, no eth.data.src, skip'.format(ts, idx_packet))
+            continue
+          if not hasattr(eth.data, 'dst'):
+            print('[{:.6f}] idx_packet={}, no eth.data.dst, skip'.format(ts, idx_packet))
+            continue
+
           ip_src_legal = socket.inet_ntoa(eth.data.src) == '192.168.2.14' or socket.inet_ntoa(eth.data.src) == '192.168.2.65'
           ip_dst_legal = socket.inet_ntoa(eth.data.dst) == '192.168.2.14' or socket.inet_ntoa(eth.data.dst) == '192.168.2.65'
           if not (ip_src_legal and ip_dst_legal):
@@ -393,7 +412,7 @@ class OCULiiDecoderNetworkPackets(object):
           self.frame_infos.to_csv(os.path.join(self.output_path, 'logs.csv'))
 
           print('include_number_of_frames = {}'.format(self.frame_infos.shape[0]))
-          print('generate_number_of_frames = {}'.format(len(os.listdir(self.output_path)) - 1))
+          # print('generate_number_of_frames = {}'.format(len(os.listdir(self.output_path)) - 1))
 
           exit()
 
