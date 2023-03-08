@@ -230,23 +230,35 @@ def main():
 
     min_cnt_frames = args.min_cnt_frames
     cnt_group_frames = []
-    info_group = dict()
+    groups_info = []
     res_groupby = df_legal.groupby(['continue_group', 'TIRadar_group'])
-    for id_group, (group_name, group_df) in enumerate(res_groupby):
-        log('=' * 100)
 
-        day = group_name[1].split('_')[0]
-        mode_name = group_name[1].split('_')[2]
-        group_folder_name = '{}_group{:>04d}_{}_{}frames'.format(day, id_group, mode_name, len(group_df))
-
+    # filter by cnt_frames_in_group
+    for group_name, group_df in res_groupby:
         cnt_frames = len(group_df)
         if cnt_frames < min_cnt_frames:
-            log_YELLOW('Skip {}, the number of frames is {}(<{})'.format(group_folder_name, cnt_frames, min_cnt_frames))
+            log_YELLOW(
+                'Skip continue_group={}, TIRadar_group={}, the number of frames is {}(<{})'.format(group_name[0], group_name[1], cnt_frames, min_cnt_frames)
+            )
             continue
+        cnt_group_frames.append(cnt_frames)
+        groups_info.append(
+            {
+                'group_df': group_df,
+                'day': group_name[1].split('_')[0],
+                'mode_name': group_name[1].split('_')[2]
+            }
+        )
 
-        cnt_group_frames.append(len(group_df))
-        info_group['group_{:>04d}'.format(id_group)] = group_df
+    # generate group folder and files
+    for id_group in range(len(groups_info)):
+        log('=' * 100)
 
+        day = groups_info[id_group]['day']
+        mode_name = groups_info[id_group]['mode_name']
+        group_df = groups_info[id_group]['group_df']
+
+        group_folder_name = '{}_group{:>04d}_{}_{}frames'.format(day, id_group, mode_name, len(group_df))
         group_folder_path = os.path.join(root_output, group_folder_name)
         # create group_folder
         if not os.path.exists(group_folder_path):
