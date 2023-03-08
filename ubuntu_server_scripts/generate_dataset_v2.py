@@ -233,10 +233,13 @@ def main():
     groups_info = []
     res_groupby = df_legal.groupby(['continue_group', 'TIRadar_group'])
 
-    # filter by cnt_frames_in_group
+    # normal mode group filter by min_cnt_frames
     for group_name, group_df in res_groupby:
         cnt_frames = len(group_df)
-        if cnt_frames < min_cnt_frames:
+        day = group_name[1].split('_')[0]
+        mode_name = group_name[1].split('_')[2]
+
+        if cnt_frames < min_cnt_frames and mode_name != 'mixmode':
             log_YELLOW(
                 'Skip continue_group={}, TIRadar_group={}, the number of frames is {}(<{})'.format(group_name[0], group_name[1], cnt_frames, min_cnt_frames)
             )
@@ -245,8 +248,8 @@ def main():
         groups_info.append(
             {
                 'group_df': group_df,
-                'day': group_name[1].split('_')[0],
-                'mode_name': group_name[1].split('_')[2]
+                'day': day,
+                'mode_name': mode_name
             }
         )
 
