@@ -1,6 +1,5 @@
 import time
 import numpy as np
-import cupy as cp
 
 class NormalModeProcess(object):
     def __init__(self, infos, data_real, data_imag, calib, apply_vmax_extend=True):
@@ -746,6 +745,7 @@ class NormalModeProcess(object):
         doppler = self.res_doa['doppler']
         snr = self.res_doa['snr']
         intensity = self.res_doa['intensity']
+        noise = self.res_doa['noise']
 
         self.pcd = {
             'x': x,
@@ -753,7 +753,8 @@ class NormalModeProcess(object):
             'z': z,
             'doppler': doppler,
             'snr': snr,
-            'intensity': intensity
+            'intensity': intensity,
+            'noise': noise
         }
 
     def __generate_heatmapBEV__(self, doppler_correction=False):
