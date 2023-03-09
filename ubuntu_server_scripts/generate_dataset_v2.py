@@ -254,12 +254,14 @@ def main():
         )
 
     # generate group folder and files
-    for id_group in range(len(groups_info)):
+    cnt_groups = len(groups_info)
+    for id_group in range(cnt_groups):
         log('=' * 100)
 
         day = groups_info[id_group]['day']
         mode_name = groups_info[id_group]['mode_name']
         group_df = groups_info[id_group]['group_df']
+        cnt_frames = len(group_df)
 
         group_folder_name = '{}_group{:>04d}_{}_{}frames'.format(day, id_group, mode_name, len(group_df))
         group_folder_path = os.path.join(root_output, group_folder_name)
@@ -275,8 +277,8 @@ def main():
                 os.makedirs(group_frame_folder_path)
             log(
                 '>>>> ({}/{}){} | ({}/{}){}'.format(
-                    id_group+1, res_groupby.ngroups, group_folder_name,
-                    id_frame+1, len(group_df), group_frame_folder_name
+                    id_group+1, cnt_groups, group_folder_name,
+                    id_frame+1, cnt_frames, group_frame_folder_name
                 )
             )
 
