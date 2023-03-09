@@ -106,7 +106,7 @@ def generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, 
     ts = group_df['{}_ts'.format(sensor)].iloc[id_frame]
     file_path = group_df['{}_files_path'.format(sensor)].iloc[id_frame]
     file_name = os.path.basename(file_path)
-    suffix = '.{}'.format(file_name.split('.')[-1])
+    suffix = file_name.replace('{}.{}'.format(file_name.split('.')[0], file_name.split('.')[1]), '')
     sensor_path = os.path.join(group_frame_folder_path, sensor)
     if not os.path.exists(sensor_path):
         os.makedirs(sensor_path)
