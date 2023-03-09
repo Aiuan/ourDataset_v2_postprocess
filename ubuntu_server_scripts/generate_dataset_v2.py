@@ -2,6 +2,7 @@ import os
 import shutil
 import sys
 import argparse
+import glob
 
 CURRENT_ROOT = os.path.dirname(os.path.abspath(sys.argv[0]))
 ROOT = os.path.join(CURRENT_ROOT, '../')
@@ -118,6 +119,21 @@ def generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, 
     json_path = os.path.join(sensor_path, file_name_new.replace(suffix, '.json'))
     save_dict_as_json(json_path, sensor_info)
     log_GREEN('    generate {} folder completely '.format(sensor))
+
+def add_calibmat(sensor, root_calibration, day, group_df, id_frame, group_frame_folder_path):
+    mode_name = group_df['TIRadar_group'].iloc[id_frame].split('_')[2]
+
+    mat_path = ''
+    if day in ['20221217', '20221219', '20221220', '20221221']:
+        mat_path = glob.glob(os.path.join(root_calibration, 'code', 'zhoushan_20221217_20221221', 'results', '{}*.mat'.format(mode_name)))[0]
+    elif day in ['20221223', '20221224']:
+        mat_path = glob.glob(os.path.join(root_calibration, 'code', 'yantai_20221223_20221226', 'results', '{}*.mat'.format(mode_name)))[0]
+    else:
+        log_YELLOW('Do not have calibmat results for {} {}'.format(day, mode_name))
+
+    if os.path.exists(mat_path):
+        sensor_path = os.path.join(group_frame_folder_path, sensor)
+        shutil.copy(mat_path, sensor_path)
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -289,6 +305,7 @@ def main():
             sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'TIRadar_to_LeopardCamera0_extrinsic.json', 'RT')
             sensor_info = add_calibres_to_dict(sensor_info, root_calibration, day, 'TIRadar_to_LeopardCamera1_extrinsic.json', 'RT')
             generate_sensor_folder(sensor, group_df, id_frame, group_frame_folder_path, sensor_info)
+            add_calibmat(sensor, root_calibration, day, group_df, id_frame, group_frame_folder_path)
 
             # OCULiiRadar
             sensor = 'OCULiiRadar'
