@@ -348,6 +348,22 @@ class Frame(object):
 
         return None
 
+def pcd_transform(pcd_dict, extrinsic):
+    assert 'x' in pcd_dict.keys()
+    assert 'y' in pcd_dict.keys()
+    assert 'z' in pcd_dict.keys()
 
+    xyz1 = np.stack((
+        pcd_dict['x'],
+        pcd_dict['y'],
+        pcd_dict['z'],
+        np.ones((pcd_dict['x'].shape[0]))
+    ))
 
-        
+    xyz1_new = np.matmul(extrinsic, xyz1)
+
+    pcd_dict['x'] = xyz1_new[0, :]
+    pcd_dict['y'] = xyz1_new[1, :]
+    pcd_dict['z'] = xyz1_new[2, :]
+
+    return pcd_dict
