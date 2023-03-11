@@ -8,8 +8,8 @@ class NormalModeProcess(object):
         # data_real.shape[2]=data_imag.shape[2]=16: ordered by dev[0,1,2,3]_rx[0,1,2,3],
         # data_real.shape[3]=data_imag.shape[3]=12: ordered by self.tx_id_transfer_order
         self.data_raw = data_real + data_imag * 1j
-        self.rangeFFT_size = self.data_raw.shape[0]
-        self.dopplerFFT_size = self.data_raw.shape[1]
+        self.rangeFFT_size = int(np.power(2, np.ceil(np.log2(self.data_raw.shape[0]))))
+        self.dopplerFFT_size = int(np.power(2, np.ceil(np.log2(self.data_raw.shape[1]))))
         self.azimuthFFT_size = 256
         self.elevationFFT_size = 256
 

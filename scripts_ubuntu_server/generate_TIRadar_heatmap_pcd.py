@@ -44,10 +44,14 @@ def main():
 
         name_group_folder = item
 
+        flag_skip = False
         for key in filter_keys:
             if not (key in name_group_folder):
                 log_YELLOW('Skip {}, filtered by key={}'.format(name_group_folder, key))
-                continue
+                flag_skip = True
+                break
+        if flag_skip:
+            continue
 
         path_group_folder = os.path.join(root_dataset, name_group_folder)
         names_frame_folder = os.listdir(path_group_folder)
@@ -58,10 +62,21 @@ def main():
             path_frame_folder = os.path.join(path_group_folder, name_frame_folder)
             path_TIRadar_folder = os.path.join(path_frame_folder, 'TIRadar')
 
+            flag_skip = True
+            if generate_pcd and len(glob.glob(os.path.join(path_TIRadar_folder, '*.pcd'))) == 0:
+                flag_skip = False
+            if generate_heatmapBEV and len(glob.glob(os.path.join(path_TIRadar_folder, '*.heatmapBEV.npz'))) == 0:
+                flag_skip = False
+            if generate_heatmap4D and len(glob.glob(os.path.join(path_TIRadar_folder, '*.heatmap4D.npz'))) == 0:
+                flag_skip = False
+            if flag_skip:
+                log_YELLOW('Skip, results have already been generated')
+                continue
+
             TIRadar_json = load_json(glob.glob(os.path.join(path_TIRadar_folder, '*.json'))[0])
             timestamp_unix = TIRadar_json['timestamp']
             localtime = unix2local(timestamp_unix)
-            TIRadar_npz = load_TIRadar_npz(glob.glob(os.path.join(path_TIRadar_folder, '*.npz'))[0])
+            TIRadar_npz = load_TIRadar_adcdata(glob.glob(os.path.join(path_TIRadar_folder, '*.npz'))[0])
             TIRadar_calibmat = load_TIRadar_calibmat(glob.glob(os.path.join(path_TIRadar_folder, '*.mat'))[0])
 
             nmp = NormalModeProcess(TIRadar_npz['mode_infos'], TIRadar_npz['data_real'], TIRadar_npz['data_imag'], TIRadar_calibmat)
