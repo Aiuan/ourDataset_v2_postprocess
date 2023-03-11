@@ -44,6 +44,11 @@ def main():
 
         name_group_folder = item
 
+        # skip mixmode
+        if 'mixmode' in name_group_folder:
+            log_YELLOW('Skip {}, is mixmode'.format(name_group_folder))
+            continue
+
         flag_skip = False
         for key in filter_keys:
             if not (key in name_group_folder):
