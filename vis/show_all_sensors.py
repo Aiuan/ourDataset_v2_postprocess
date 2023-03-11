@@ -19,7 +19,6 @@ def main():
 
     IRayCamera_json = frame.get_sensor_data('IRayCamera_json')
     IRayCamera_ts_str = IRayCamera_json['timestamp']
-
     IRayCamera_png = frame.get_sensor_data('IRayCamera_png')
 
     LeopardCamera0_json = frame.get_sensor_data('LeopardCamera0_json')
