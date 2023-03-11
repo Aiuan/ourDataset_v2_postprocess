@@ -70,7 +70,7 @@ def main():
         with writer.saving(fig, output_path, dpi=100):
             for id_frame, name_frame_folder in enumerate(names_frame_folder):
                 assert id_frame == int(name_frame_folder.replace('frame', ''))
-                log('>>>> {} {}/{} frame'.format(name_group_folder, id_frame + 1, num_frames))
+                log('>>>> {} {}/{} {}'.format(name_group_folder, id_frame + 1, num_frames, name_frame_folder))
 
                 path_frame_folder = os.path.join(path_group_folder, name_frame_folder)
                 frame = Frame(path_frame_folder)
