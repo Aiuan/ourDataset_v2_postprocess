@@ -272,6 +272,7 @@ class Group(object):
     def __init__(self, root):
         self.root = root
         self.frame_foldernames = os.listdir(self.root)
+        self.frame_foldernames.sort()
         self.num_frames = len(self.frame_foldernames)
 
     def __len__(self):

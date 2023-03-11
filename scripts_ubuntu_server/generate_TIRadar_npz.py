@@ -23,12 +23,14 @@ def main():
     root = args.data_path  # 'F:\\20221217\\TIRadar'
     output_root = '{}_npz'.format(root)  # 'F:\\20221217\\TIRadar_npz'
     subfolders = os.listdir(root)
+    subfolders.sort()
     for i, item in enumerate(subfolders):
         output_folder = os.path.join(output_root, item)
         log('='*100)
 
         if os.path.exists(output_folder):
             files = os.listdir(output_folder)
+            files.sort()
             if len(files) >= int(item.split('_')[-1]) - 2:
                 log_YELLOW('({}/{}) Already generated {}'.format(i+1, len(subfolders), output_folder))
                 continue

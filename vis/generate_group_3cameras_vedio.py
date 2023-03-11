@@ -61,12 +61,15 @@ def main():
 
         path_group_folder = os.path.join(root_dataset, name_group_folder)
         names_frame_folder = os.listdir(path_group_folder)
+        # sort, otherwise will occur frame_idx mess
+        names_frame_folder.sort()
         num_frames = len(names_frame_folder)
 
         output_path = os.path.join(root_output, '{}.mp4'.format(name_group_folder))
         writer = FFMpegWriter(fps=10)
         with writer.saving(fig, output_path, dpi=100):
             for id_frame, name_frame_folder in enumerate(names_frame_folder):
+                assert id_frame == int(name_frame_folder.replace('frame', ''))
                 log('>>>> {} {}/{} frame'.format(name_group_folder, id_frame + 1, num_frames))
 
                 path_frame_folder = os.path.join(path_group_folder, name_frame_folder)
@@ -108,21 +111,21 @@ def main():
                 ax1 = fig.add_axes((w0, (1-h1)/3, w1, h1))
                 ax1.imshow(IRayCamera_png, cmap='gray')
                 ax1.axis('off')
-                ax1.set_title('IRayCamera\n{}'.format(IRayCamera_localtime))
+                ax1.set_title('IRayCamera({}/{})\n{}'.format(id_frame + 1, num_frames, IRayCamera_localtime))
 
                 ax2 = fig.add_axes((w0 + w1 + w0, (1-h1)/3, w2, h1))
                 ax2.imshow(LeopardCamera0_png)
                 ax2.axis('off')
-                ax2.set_title('LeopardCamera0\n{}'.format(LeopardCamera0_localtime))
+                ax2.set_title('LeopardCamera0({}/{})\n{}'.format(id_frame + 1, num_frames, LeopardCamera0_localtime))
 
                 ax3 = fig.add_axes((w0 + w1 + w0 + w2 + w0, (1-h1)/3, w3, h1))
                 ax3.imshow(LeopardCamera1_png)
                 ax3.axis('off')
-                ax3.set_title('LeopardCamera1\n{}'.format(LeopardCamera1_localtime))
+                ax3.set_title('LeopardCamera1({}/{})\n{}'.format(id_frame + 1, num_frames, LeopardCamera1_localtime))
 
                 writer.grab_frame()
                 if show:
-                    plt.pause(0.01)
+                    plt.pause(0.1)
                 plt.clf()
 
         log_GREEN('Generate {}'.format(output_path))
