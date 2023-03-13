@@ -5,6 +5,7 @@ import glob
 
 import numpy as np
 import cv2
+import pandas as pd
 import scipy.io as scio
 
 def log(text):
@@ -239,35 +240,6 @@ def save_dict_as_json(json_path, dict_data):
     with open(json_path, 'w', newline='\n') as f:
         f.write(data)
 
-
-if __name__ == '__main__':
-    import glob
-    import matplotlib.pyplot as plt
-
-    folder = 'F:\\dataset_v2\\20221217_group0000_mode1_280frames\\frame0000\\LeopardCamera1'
-    json_path = glob.glob(os.path.join(folder, '*.json'))[0]
-    image_path = glob.glob(os.path.join(folder, '*.png'))[0]
-    data_json = load_json(json_path)
-    LeopardCamera0_image = load_LeopardCamera_png(image_path)
-
-    image_undistort = undistort_image(
-        LeopardCamera0_image,
-        np.array(data_json['intrinsic_matrix']),
-        np.array(data_json['radial_distortion']),
-        np.array(data_json['tangential_distortion'])
-    )
-
-    plt.figure()
-    plt.subplot(2, 1, 1)
-    plt.imshow(LeopardCamera0_image)
-
-    plt.subplot(2, 1, 2)
-    plt.imshow(image_undistort)
-
-
-    plt.show()
-
-
 class Group(object):
     def __init__(self, root):
         self.root = root
@@ -280,6 +252,36 @@ class Group(object):
 
     def __getitem__(self, idx_frame):
         return Frame(os.path.join(self.root, 'frame{:>04d}'.format(idx_frame)))
+
+    def get_route(self):
+        route = {
+            'timestamp': [],
+            'latitude_N': [],
+            'longitude_E': [],
+            'height': [],
+            'north_vel': [],
+            'east_vel': [],
+            'up_vel': [],
+            'pitch': [],
+            'roll': [],
+            'azimuth': []
+        }
+        for idx_frame in range(self.__len__()):
+            frame = self.__getitem__(idx_frame)
+            MEMS_json = frame.get_sensor_data('MEMS_json')
+            route['timestamp'].append(MEMS_json['timestamp'])
+            route['latitude_N'].append(MEMS_json['msg_ins']['latitude_N'])
+            route['longitude_E'].append(MEMS_json['msg_ins']['longitude_E'])
+            route['height'].append(MEMS_json['msg_ins']['height'])
+            route['north_vel'].append(MEMS_json['msg_ins']['north_vel'])
+            route['east_vel'].append(MEMS_json['msg_ins']['east_vel'])
+            route['up_vel'].append(MEMS_json['msg_ins']['up_vel'])
+            route['pitch'].append(MEMS_json['msg_ins']['pitch'])
+            route['roll'].append(MEMS_json['msg_ins']['roll'])
+            route['azimuth'].append(MEMS_json['msg_ins']['azimuth'])
+
+        route = pd.DataFrame(route)
+        return route
 
 class Frame(object):
     def __init__(self, root):
