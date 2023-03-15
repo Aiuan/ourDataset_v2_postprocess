@@ -808,47 +808,47 @@ class NormalModeProcess(object):
         }
 
     def __generate_heatmap4D__(self, doppler_correction=False):
-        pass
-        # sig = self.data_dopplerFFT
-        #
-        # if doppler_correction:
-        #     # add Doppler correction before generating the heatmap
-        #     delta_phi = 2 * np.pi * (np.arange(self.dopplerFFT_size) - self.dopplerFFT_size / 2) / \
-        #                 (self.num_tx * self.dopplerFFT_size)
-        #     cor_vec = np.exp(-1j * delta_phi.reshape((-1, 1)) * np.arange(self.num_tx).reshape((1, -1)))
-        #
-        #     sig = sig * np.expand_dims(np.expand_dims(cor_vec, axis=1), axis=0)
-        #
-        # sig_space = np.zeros(
-        #     (self.rangeFFT_size, self.dopplerFFT_size, self.virtual_array_azimuth.max() + 1, self.virtual_array_elevation.max() + 1),
-        #     dtype=sig.dtype
-        # )
-        # sig_space_index0 = self.virtual_array_noredundant[:, 0]
-        # sig_space_index1 = self.virtual_array_noredundant[:, 1]
-        # sig_index0 = np.array(
-        #     [np.argwhere(self.rx_id_onboard == i_rx)[0][0] for i_rx in self.virtual_array_noredundant[:, 2]])
-        # sig_index1 = np.array(
-        #     [np.argwhere(self.tx_id_transfer_order == i_tx)[0][0] for i_tx in self.virtual_array_noredundant[:, 3]])
-        # sig_space[:, :, sig_space_index0, sig_space_index1] = sig[:, :, sig_index0, sig_index1]
-        #
-        # sig_space = cp.asarray(sig_space)
-        # sig_space_azimuthFFT = cp.fft.fftshift(cp.fft.fft(sig_space, n=self.azimuthFFT_size, axis=2), axes=2)
-        # sig_space_elevationFFT = cp.fft.fftshift(cp.fft.fft(sig_space_azimuthFFT, n=self.elevationFFT_size, axis=3), axes=3)
-        # heatmap4D = cp.abs(sig_space_elevationFFT)
-        # heatmap4D = cp.asnumpy(heatmap4D)
-        #
-        # r = self.range_bins
-        # azi = np.arcsin(self.azimuth_bins / 2 / np.pi / self.doa_unitDis) / np.pi * 180
-        # ele = np.arcsin(self.elevation_bins / 2 / np.pi / self.doa_unitDis) / np.pi * 180
-        # x = r * np.cos(ele / 180 * np.pi) * np.sin(azi / 180 * np.pi)
-        # y = r * np.cos(ele / 180 * np.pi) * np.cos(azi / 180 * np.pi)
-        # z = r * np.sin(ele / 180 * np.pi)
-        # doppler = self.doppler_bins
-        #
-        # self.heatmap4D = {
-        #     'heatmap4D': heatmap4D,
-        #     'x': x,
-        #     'y': y,
-        #     'z': z,
-        #     'doppler': doppler
-        # }
+        sig = self.data_dopplerFFT
+
+        if doppler_correction:
+            # add Doppler correction before generating the heatmap
+            delta_phi = 2 * np.pi * (np.arange(self.dopplerFFT_size) - self.dopplerFFT_size / 2) / \
+                        (self.num_tx * self.dopplerFFT_size)
+            cor_vec = np.exp(-1j * delta_phi.reshape((-1, 1)) * np.arange(self.num_tx).reshape((1, -1)))
+
+            sig = sig * np.expand_dims(np.expand_dims(cor_vec, axis=1), axis=0)
+
+        sig_space = np.zeros(
+            (self.rangeFFT_size, self.dopplerFFT_size, self.virtual_array_azimuth.max() + 1,
+             self.virtual_array_elevation.max() + 1),
+            dtype=sig.dtype
+        )
+        sig_space_index0 = self.virtual_array_noredundant[:, 0]
+        sig_space_index1 = self.virtual_array_noredundant[:, 1]
+        sig_index0 = np.array(
+            [np.argwhere(self.rx_id_onboard == i_rx)[0][0] for i_rx in self.virtual_array_noredundant[:, 2]])
+        sig_index1 = np.array(
+            [np.argwhere(self.tx_id_transfer_order == i_tx)[0][0] for i_tx in self.virtual_array_noredundant[:, 3]])
+        sig_space[:, :, sig_space_index0, sig_space_index1] = sig[:, :, sig_index0, sig_index1]
+
+        sig_space_azimuthFFT = np.fft.fftshift(np.fft.fft(sig_space, n=self.azimuthFFT_size, axis=2), axes=2)
+        sig_space_elevationFFT = np.fft.fftshift(np.fft.fft(sig_space_azimuthFFT, n=self.elevationFFT_size, axis=3),
+                                                 axes=3)
+        heatmap4D = np.abs(sig_space_elevationFFT)
+        heatmap4D = np.asnumpy(heatmap4D)
+
+        r = self.range_bins
+        azi = np.arcsin(self.azimuth_bins / 2 / np.pi / self.doa_unitDis) / np.pi * 180
+        ele = np.arcsin(self.elevation_bins / 2 / np.pi / self.doa_unitDis) / np.pi * 180
+        x = r * np.cos(ele / 180 * np.pi) * np.sin(azi / 180 * np.pi)
+        y = r * np.cos(ele / 180 * np.pi) * np.cos(azi / 180 * np.pi)
+        z = r * np.sin(ele / 180 * np.pi)
+        doppler = self.doppler_bins
+
+        self.heatmap4D = {
+            'heatmap4D': heatmap4D,
+            'x': x,
+            'y': y,
+            'z': z,
+            'doppler': doppler
+        }

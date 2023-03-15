@@ -200,10 +200,11 @@ def unix2local(unix_ts_str):
     # unix_timestamp_str --> local_timestamp_str
     return '{}.{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(unix_ts_str))), unix_ts_str.split('.')[-1])
 
-def pcd_in_zone(pcd_dict, xlim=[-np.inf, np.inf], ylim=[-np.inf, np.inf], zlim=[-np.inf, np.inf]):
+def pcd_in_zone(pcd_dict, xlim=[-np.inf, np.inf], ylim=[-np.inf, np.inf], zlim=[-np.inf, np.inf], return_type='np_array'):
     assert 'x' in pcd_dict.keys()
     assert 'y' in pcd_dict.keys()
     assert 'z' in pcd_dict.keys()
+    assert return_type == 'np_array' or return_type == 'dict'
 
     mask_x = np.logical_and(
         pcd_dict['x'] >= xlim[0],
@@ -222,8 +223,35 @@ def pcd_in_zone(pcd_dict, xlim=[-np.inf, np.inf], ylim=[-np.inf, np.inf], zlim=[
 
     mask = np.logical_and(np.logical_and(mask_x, mask_y), mask_z)
 
-    res = np.array(list(pcd_dict.values())).T
-    res = res[mask, :]
+    if return_type == 'np_array':
+        res = np.array(list(pcd_dict.values())).T
+        res = res[mask, :]
+    else:
+        res = dict()
+        for key, value in pcd_dict.items():
+            res[key] = pcd_dict[key][mask]
+
+    return res
+
+def pcd_in_range(pcd_dict, rlim, return_type='np_array'):
+    assert 'x' in pcd_dict.keys()
+    assert 'y' in pcd_dict.keys()
+    assert 'z' in pcd_dict.keys()
+    assert return_type == 'np_array' or return_type == 'dict'
+
+    r = np.sqrt(
+        np.power(pcd_dict['x'], 2) + np.power(pcd_dict['y'], 2) + np.power(pcd_dict['z'], 2)
+    )
+
+    mask = r <= rlim
+
+    if return_type == 'np_array':
+        res = np.array(list(pcd_dict.values())).T
+        res = res[mask, :]
+    else:
+        res = dict()
+        for key, value in pcd_dict.items():
+            res[key] = pcd_dict[key][mask]
 
     return res
 
