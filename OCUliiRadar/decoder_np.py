@@ -279,7 +279,10 @@ class TrackerBlock(object):
       'Bus and Truck',
       'Background'
     ]
-    self.classname = classnames[self.Class]
+    if self.Class >= 0 and self.Class < len(classnames):
+      self.classname = classnames[self.Class]
+    else:
+      self.classname = 'Error'
 
 class OCULiiDecoderNetworkPackets(object):
     def __init__(self, pcap_path, output_path, pcd_file_type='pcd'):
