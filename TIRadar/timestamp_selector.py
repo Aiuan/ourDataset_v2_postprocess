@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from dataset_v2 import log_BLUE, unix2local
 
 class DataFolder(object):
     def __init__(self, folder_path):
@@ -33,6 +34,11 @@ class DataFolder(object):
                 self.group = np.concatenate((self.group, group))
 
         self.ts = self.ts_str.astype('float64')
+        log_BLUE('{}: from {} to {}'.format(
+            os.path.basename(folder_path),
+            unix2local(self.ts_str[0]),
+            unix2local(self.ts_str[-1])
+        ))
 
     def select_by_ts(self, ts_str):
         tmp = float(ts_str) - self.ts
