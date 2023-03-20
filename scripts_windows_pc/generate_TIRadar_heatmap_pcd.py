@@ -13,7 +13,7 @@ from utils import *
 from TIRadar.signal_process import NormalModeProcess
 
 def main():
-    root_dataset = 'F:\\dataset_v2'
+    root_dataset = 'F:\\ourDataset_v2'
     names_group_folder = os.listdir(root_dataset)
     num_groups = len(names_group_folder)
     generate_pcd = True
@@ -28,7 +28,7 @@ def main():
         for id_frame, name_frame_folder in enumerate(names_frame_folder):
             log_BLUE('='*100)
             path_frame_folder = os.path.join(path_group_folder, name_frame_folder)
-            path_TIRadar_folder = os.path.join(path_frame_folder, '../TIRadar')
+            path_TIRadar_folder = os.path.join(path_frame_folder, 'TIRadar')
 
             TIRadar_json = load_json(glob.glob(os.path.join(path_TIRadar_folder, '*.json'))[0])
             timestamp_unix = TIRadar_json['timestamp']
