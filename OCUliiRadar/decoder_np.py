@@ -279,7 +279,10 @@ class TrackerBlock(object):
       'Bus and Truck',
       'Background'
     ]
-    self.classname = classnames[self.Class]
+    if self.Class >= 0 and self.Class < len(classnames):
+      self.classname = classnames[self.Class]
+    else:
+      self.classname = 'Error'
 
 class OCULiiDecoderNetworkPackets(object):
     def __init__(self, pcap_path, output_path, pcd_file_type='pcd'):
@@ -354,9 +357,12 @@ class OCULiiDecoderNetworkPackets(object):
       cnt_length = 0
       while cnt_length < handshake_pkg.frame_data_length:
         idx_packet, ts, pkg = self.next_udp_packet()
-        body_pkg_div = BodyPacket_divided(idx_packet, ts, pkg)
-        cnt_length += len(body_pkg_div.data)
-        self.packets_in_frame.append(body_pkg_div)
+        # judge 192.168.2.14 --> 192.168.2.65
+        eth = dpkt.ethernet.Ethernet(pkg)
+        if socket.inet_ntoa(eth.data.src) == '192.168.2.14' and socket.inet_ntoa(eth.data.dst) == '192.168.2.65':
+          body_pkg_div = BodyPacket_divided(idx_packet, ts, pkg)
+          cnt_length += len(body_pkg_div.data)
+          self.packets_in_frame.append(body_pkg_div)
       assert cnt_length == handshake_pkg.frame_data_length
 
     def next_udp_packet(self):

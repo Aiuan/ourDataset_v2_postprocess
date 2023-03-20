@@ -1,10 +1,27 @@
 import os
 import json
 import time
+import glob
 
 import numpy as np
 import cv2
+import pandas as pd
 import scipy.io as scio
+
+def log(text):
+    print(text)
+
+def log_BLUE(text):
+    print('\033[0;34;40m{}\033[0m'.format(text))
+
+def log_YELLOW(text):
+    print('\033[0;33;40m{}\033[0m'.format(text))
+
+def log_GREEN(text):
+    print('\033[0;32;40m{}\033[0m'.format(text))
+
+def log_RED(text):
+    print('\033[0;31;40m{}\033[0m'.format(text))
 
 class GroupFolder(object):
     def __init__(self, path_group_folder):
@@ -107,7 +124,7 @@ def load_OCULiiRadar_pcd(path):
     }
     return res
 
-def load_TIRadar_npz(path):
+def load_TIRadar_adcdata(path):
     data = np.load(path, allow_pickle=True)
 
     res = {
@@ -140,15 +157,54 @@ def load_TIRadar_calibmat(path):
 
     return res
 
+def load_TIRadar_heatmapBEV(path):
+    data = np.load(path, allow_pickle=True)
+
+    res = {
+        'x': data['x'],
+        'y': data['y'],
+        'heatmapBEV_static': data['heatmapBEV_static'],
+        'heatmapBEV_dynamic': data['heatmapBEV_dynamic']
+    }
+    return res
+
+def load_TIRadar_pcd(path):
+    with open(path, "r") as f:
+        data = f.readlines()
+    data = data[10:]
+    data = np.array(data)
+    data = np.char.replace(data, '\n', '')
+    data = np.char.split(data, ' ')
+    data = np.array(data.tolist())
+
+    x = np.array(data[:, 0], dtype=np.float32)
+    y = np.array(data[:, 1], dtype=np.float32)
+    z = np.array(data[:, 2], dtype=np.float32)
+    doppler = np.array(data[:, 3], dtype=np.float32)
+    snr = np.array(data[:, 4], dtype=np.float32)
+    intensity = np.array(data[:, 5], dtype=np.float32)
+    noise = np.array(data[:, 6], dtype=np.float32)
+
+    res = {
+        'x': x,
+        'y': y,
+        'z': z,
+        'doppler': doppler,
+        'snr': snr,
+        'intensity': intensity,
+        'noise': noise
+    }
+    return res
 
 def unix2local(unix_ts_str):
     # unix_timestamp_str --> local_timestamp_str
     return '{}.{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(unix_ts_str))), unix_ts_str.split('.')[-1])
 
-def pcd_in_zone(pcd_dict, xlim=[-np.inf, np.inf], ylim=[-np.inf, np.inf], zlim=[-np.inf, np.inf]):
+def pcd_in_zone(pcd_dict, xlim=[-np.inf, np.inf], ylim=[-np.inf, np.inf], zlim=[-np.inf, np.inf], return_type='np_array'):
     assert 'x' in pcd_dict.keys()
     assert 'y' in pcd_dict.keys()
     assert 'z' in pcd_dict.keys()
+    assert return_type == 'np_array' or return_type == 'dict'
 
     mask_x = np.logical_and(
         pcd_dict['x'] >= xlim[0],
@@ -167,8 +223,35 @@ def pcd_in_zone(pcd_dict, xlim=[-np.inf, np.inf], ylim=[-np.inf, np.inf], zlim=[
 
     mask = np.logical_and(np.logical_and(mask_x, mask_y), mask_z)
 
-    res = np.array(list(pcd_dict.values())).T
-    res = res[mask, :]
+    if return_type == 'np_array':
+        res = np.array(list(pcd_dict.values())).T
+        res = res[mask, :]
+    else:
+        res = dict()
+        for key, value in pcd_dict.items():
+            res[key] = pcd_dict[key][mask]
+
+    return res
+
+def pcd_in_range(pcd_dict, rlim, return_type='np_array'):
+    assert 'x' in pcd_dict.keys()
+    assert 'y' in pcd_dict.keys()
+    assert 'z' in pcd_dict.keys()
+    assert return_type == 'np_array' or return_type == 'dict'
+
+    r = np.sqrt(
+        np.power(pcd_dict['x'], 2) + np.power(pcd_dict['y'], 2) + np.power(pcd_dict['z'], 2)
+    )
+
+    mask = r <= rlim
+
+    if return_type == 'np_array':
+        res = np.array(list(pcd_dict.values())).T
+        res = res[mask, :]
+    else:
+        res = dict()
+        for key, value in pcd_dict.items():
+            res[key] = pcd_dict[key][mask]
 
     return res
 
@@ -185,30 +268,133 @@ def save_dict_as_json(json_path, dict_data):
     with open(json_path, 'w', newline='\n') as f:
         f.write(data)
 
+class Group(object):
+    def __init__(self, root):
+        self.root = root
+        self.frame_foldernames = os.listdir(self.root)
+        self.frame_foldernames.sort()
+        self.num_frames = len(self.frame_foldernames)
 
-if __name__ == '__main__':
-    import glob
-    import matplotlib.pyplot as plt
+    def __len__(self):
+        return self.num_frames
 
-    folder = 'F:\\dataset_v2\\20221217_group0000_mode1_280frames\\frame0000\\LeopardCamera1'
-    json_path = glob.glob(os.path.join(folder, '*.json'))[0]
-    image_path = glob.glob(os.path.join(folder, '*.png'))[0]
-    data_json = load_json(json_path)
-    LeopardCamera0_image = load_LeopardCamera_png(image_path)
+    def __getitem__(self, idx_frame):
+        return Frame(os.path.join(self.root, 'frame{:>04d}'.format(idx_frame)))
 
-    image_undistort = undistort_image(
-        LeopardCamera0_image,
-        np.array(data_json['intrinsic_matrix']),
-        np.array(data_json['radial_distortion']),
-        np.array(data_json['tangential_distortion'])
-    )
+    def get_route(self):
+        route = {
+            'timestamp': [],
+            'latitude_N': [],
+            'longitude_E': [],
+            'height': [],
+            'north_vel': [],
+            'east_vel': [],
+            'up_vel': [],
+            'pitch': [],
+            'roll': [],
+            'azimuth': []
+        }
+        for idx_frame in range(self.__len__()):
+            frame = self.__getitem__(idx_frame)
+            MEMS_json = frame.get_sensor_data('MEMS_json')
+            route['timestamp'].append(MEMS_json['timestamp'])
+            route['latitude_N'].append(MEMS_json['msg_ins']['latitude_N'])
+            route['longitude_E'].append(MEMS_json['msg_ins']['longitude_E'])
+            route['height'].append(MEMS_json['msg_ins']['height'])
+            route['north_vel'].append(MEMS_json['msg_ins']['north_vel'])
+            route['east_vel'].append(MEMS_json['msg_ins']['east_vel'])
+            route['up_vel'].append(MEMS_json['msg_ins']['up_vel'])
+            route['pitch'].append(MEMS_json['msg_ins']['pitch'])
+            route['roll'].append(MEMS_json['msg_ins']['roll'])
+            route['azimuth'].append(MEMS_json['msg_ins']['azimuth'])
 
-    plt.figure()
-    plt.subplot(2, 1, 1)
-    plt.imshow(LeopardCamera0_image)
+        route = pd.DataFrame(route)
+        return route
 
-    plt.subplot(2, 1, 2)
-    plt.imshow(image_undistort)
+class Frame(object):
+    def __init__(self, root):
+        self.root = root
 
+        self.IRayCamera_png_path = self.__find_and_check_path__(os.path.join(self.root, 'IRayCamera', '*.png'))
+        self.IRayCamera_json_path = self.__find_and_check_path__(os.path.join(self.root, 'IRayCamera', '*.json'))
 
-    plt.show()
+        self.LeopardCamera0_png_path = self.__find_and_check_path__(os.path.join(self.root, 'LeopardCamera0', '*.png'))
+        self.LeopardCamera0_json_path = self.__find_and_check_path__(os.path.join(self.root, 'LeopardCamera0', '*.json'))
+
+        self.LeopardCamera1_png_path = self.__find_and_check_path__(os.path.join(self.root, 'LeopardCamera1', '*.png'))
+        self.LeopardCamera1_json_path = self.__find_and_check_path__(os.path.join(self.root, 'LeopardCamera1', '*.json'))
+
+        self.MEMS_json_path = self.__find_and_check_path__(os.path.join(self.root, 'MEMS', '*.json'))
+
+        self.OCULiiRadar_pcd_path = self.__find_and_check_path__(os.path.join(self.root, 'OCULiiRadar', '*.pcd'))
+        self.OCULiiRadar_json_path = self.__find_and_check_path__(os.path.join(self.root, 'OCULiiRadar', '*.json'))
+
+        self.TIRadar_adcdata_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.adcdata.npz'))
+        self.TIRadar_pcd_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.pcd'))
+        self.TIRadar_heatmapBEV_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.heatmapBEV.npz'))
+        self.TIRadar_json_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.json'))
+        self.TIRadar_calibmat_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.mat'))
+        
+        self.VelodyneLidar_pcd_path = self.__find_and_check_path__(os.path.join(self.root, 'VelodyneLidar', '*.pcd'))
+        self.VelodyneLidar_json_path = self.__find_and_check_path__(os.path.join(self.root, 'VelodyneLidar', '*.json'))
+
+    def __find_and_check_path__(self, path):
+        res = glob.glob(path)
+        if len(res) == 1:
+            return res[0]
+        else:
+            log_YELLOW('{} find {} results'.format(path, len(res)))
+            return None
+
+    def get_sensor_data(self, sensor_data_name):
+        if sensor_data_name == 'IRayCamera_png' and self.IRayCamera_png_path is not None:
+            return load_IRayCamera_png(self.IRayCamera_png_path)
+
+        if sensor_data_name == 'LeopardCamera0_png' and self.LeopardCamera0_png_path is not None:
+            return load_LeopardCamera_png(self.LeopardCamera0_png_path)
+
+        if sensor_data_name == 'LeopardCamera1_png' and self.LeopardCamera1_png_path is not None:
+            return load_LeopardCamera_png(self.LeopardCamera1_png_path)
+
+        if sensor_data_name == 'OCULiiRadar_pcd' and self.OCULiiRadar_pcd_path is not None:
+            return load_OCULiiRadar_pcd(self.OCULiiRadar_pcd_path)
+
+        if sensor_data_name == 'TIRadar_adcdata' and self.TIRadar_adcdata_path is not None:
+            return load_TIRadar_adcdata(self.TIRadar_adcdata_path)
+
+        if sensor_data_name == 'TIRadar_pcd' and self.TIRadar_pcd_path is not None:
+            return load_TIRadar_pcd(self.TIRadar_pcd_path)
+
+        if sensor_data_name == 'TIRadar_heatmapBEV' and self.TIRadar_heatmapBEV_path is not None:
+            return load_TIRadar_heatmapBEV(self.TIRadar_heatmapBEV_path)
+
+        if sensor_data_name == 'TIRadar_calibmat' and self.TIRadar_calibmat_path is not None:
+            return load_TIRadar_calibmat(self.TIRadar_calibmat_path)
+
+        if sensor_data_name == 'VelodyneLidar_pcd' and self.VelodyneLidar_pcd_path is not None:
+            return load_VelodyneLidar_pcd(self.VelodyneLidar_pcd_path)
+
+        if sensor_data_name.split('_')[1] == 'json' and self.__getattribute__('{}_path'.format(sensor_data_name)) is not None:
+            return load_json(self.__getattribute__('{}_path'.format(sensor_data_name)))
+
+        return None
+
+def pcd_transform(pcd_dict, extrinsic):
+    assert 'x' in pcd_dict.keys()
+    assert 'y' in pcd_dict.keys()
+    assert 'z' in pcd_dict.keys()
+
+    xyz1 = np.stack((
+        pcd_dict['x'],
+        pcd_dict['y'],
+        pcd_dict['z'],
+        np.ones((pcd_dict['x'].shape[0]))
+    ))
+
+    xyz1_new = np.matmul(extrinsic, xyz1)
+
+    pcd_dict['x'] = xyz1_new[0, :]
+    pcd_dict['y'] = xyz1_new[1, :]
+    pcd_dict['z'] = xyz1_new[2, :]
+
+    return pcd_dict

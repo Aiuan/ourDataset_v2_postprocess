@@ -8,7 +8,7 @@ sys.path.append(ROOT)
 
 import numpy as np
 import pandas as pd
-from dataset_v2 import load_json, load_TIRadar_npz, load_TIRadar_calibmat, unix2local
+from dataset_v2 import load_json, load_TIRadar_adcdata, load_TIRadar_calibmat, unix2local
 from utils import *
 from TIRadar.signal_process import NormalModeProcess
 
