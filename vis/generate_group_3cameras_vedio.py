@@ -52,13 +52,13 @@ def main():
             continue
 
         name_group_folder = item
-        flag_skip = False
+        flag_skip = True
         for key in filter_keys:
-            if not (key in name_group_folder):
-                log_YELLOW('Skip {}, filtered by key={}'.format(name_group_folder, key))
-                flag_skip = True
+            if key in name_group_folder:
+                flag_skip = False
                 break
         if flag_skip:
+            log_YELLOW('Skip {}, filtered by key={}'.format(name_group_folder, key))
             continue
 
         path_group_folder = os.path.join(root_dataset, name_group_folder)
