@@ -18,6 +18,7 @@ def get_args():
     parser.add_argument('--filter_keys', type=str, nargs='*', default=[], help='keys for filter')
     parser.add_argument('--root_output', type=str, default='/mnt/Dataset/ourDataset_v2_vis/vis_6sensors', help='output path')
     parser.add_argument('--show', type=bool, default=False, help='dynamic show or not')
+    parser.add_argument('--cover', type=bool, default=True, help='cover or not')
 
     args = parser.parse_args()
     return args
@@ -29,6 +30,7 @@ def main():
     filter_keys = args.filter_keys
     root_output = args.root_output
     show = args.show
+    cover = args.cover
 
     if not os.path.exists(root_output):
         os.makedirs(root_output)
@@ -76,6 +78,10 @@ def main():
         num_frames = len(names_frame_folder)
 
         output_path = os.path.join(root_output, '{}.mp4'.format(name_group_folder))
+        if not cover and os.path.exists(output_path):
+            log_YELLOW('Skip {}, already generate {}'.format(name_group_folder, output_path))
+            continue
+
         writer = FFMpegWriter(fps=10)
         with writer.saving(fig, output_path, dpi=dpi_vedio):
             for id_frame, name_frame_folder in enumerate(names_frame_folder):
