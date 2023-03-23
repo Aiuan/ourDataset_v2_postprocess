@@ -54,10 +54,13 @@ class NormalModeProcess(object):
         end_time = time.time()
         print('{}() function consume: {:.3f} s'.format(fn.__name__, end_time - start_time))
 
-    def run(self, generate_pcd, generate_heatmapBEV, generate_heatmap4D):
+    def run(self, generate_pcd, generate_heatmapBEV, generate_heatmap4D, cfar_type='CASO'):
         self.generate_pcd = generate_pcd
         self.generate_heatmapBEV = generate_heatmapBEV
         self.generate_heatmap4D = generate_heatmap4D
+
+        assert cfar_type in ['CASO', 'CAOS']
+        self.cfar_type = cfar_type
 
         if self.generate_pcd or self.generate_heatmapBEV or self.generate_heatmap4D:
             self.__timer__(self.__calibrate_rawdata__)
@@ -240,14 +243,24 @@ class NormalModeProcess(object):
             scale_factor = self.scale_factor[int(np.log2(self.dopplerFFT_size)-4)]
             self.data_rangeFFT *= scale_factor
 
-    def __range_cfar_os__(self):
-        refWinSize = 8
-        guardWinSize = 8
-        K0 = 5
-        discardCellLeft = 10
-        discardCellRight = 20
-        maxEnable = 0
-        sortSelectFactor = 0.75
+    def __range_cfar__(self):
+        if self.cfar_type == 'CASO':
+            refWinSize = 8
+            guardWinSize = 8
+            K0 = 5
+            discardCellLeft = 10
+            discardCellRight = 20
+            maxEnable = 0
+
+        if self.cfar_type == 'CAOS':
+            refWinSize = 8
+            guardWinSize = 8
+            K0 = 5
+            discardCellLeft = 10
+            discardCellRight = 20
+            maxEnable = 0
+            sortSelectFactor = 0.75
+
         gaptot = refWinSize + guardWinSize
         n_obj = 0
         index_obj = []
@@ -269,8 +282,12 @@ class NormalModeProcess(object):
                 index_left = list(range(index_cur - gaptot, index_cur - guardWinSize))
                 index_right = list(range(index_cur + guardWinSize + 1, index_cur + gaptot + 1))
 
-                sorted_res = np.sort(np.hstack((vec[index_left], vec[index_right])), axis=0)
-                value_selected = sorted_res[int(np.ceil(sortSelectFactor * len(sorted_res)) - 1)]
+                if self.cfar_type == 'CASO':
+                    value_selected = min(vec[index_left].mean(), vec[index_right].mean())
+
+                if self.cfar_type == 'CAOS':
+                    sorted_res = np.sort(np.hstack((vec[index_left], vec[index_right])), axis=0)
+                    value_selected = sorted_res[int(np.ceil(sortSelectFactor * len(sorted_res)) - 1)]
 
                 if maxEnable == 1:
                     # whether value_selected is the local max value
@@ -298,12 +315,20 @@ class NormalModeProcess(object):
             'snr_obj': np.array(snr_obj, dtype='float')
         }
 
-    def __doppler_cfar_os_cyclicity__(self):
-        refWinSize = 4
-        guardWinSize = 0
-        K0 = 0.5
-        maxEnable = 0
-        sortSelectFactor = 0.75
+    def __doppler_cfar_cyclicity__(self):
+        if self.cfar_type == 'CASO':
+            refWinSize = 4
+            guardWinSize = 0
+            K0 = 3
+            maxEnable = 0
+
+        if self.cfar_type == 'CAOS':
+            refWinSize = 4
+            guardWinSize = 0
+            K0 = 0.5
+            maxEnable = 0
+            sortSelectFactor = 0.75
+
         gaptot = refWinSize + guardWinSize
         n_obj = 0
         index_obj = []
@@ -326,8 +351,12 @@ class NormalModeProcess(object):
                 index_left = list(range(index_cur - gaptot, index_cur - guardWinSize))
                 index_right = list(range(index_cur + guardWinSize + 1, index_cur + gaptot + 1))
 
-                sorted_res = np.sort(np.hstack((vec[index_left], vec[index_right])), axis=0)
-                value_selected = sorted_res[int(np.ceil(sortSelectFactor * len(sorted_res)) - 1)]
+                if self.cfar_type == 'CASO':
+                    value_selected = min(vec[index_left].mean(), vec[index_right].mean())
+
+                if self.cfar_type == 'CAOS':
+                    sorted_res = np.sort(np.hstack((vec[index_left], vec[index_right])), axis=0)
+                    value_selected = sorted_res[int(np.ceil(sortSelectFactor * len(sorted_res)) - 1)]
 
                 if maxEnable == 1:
                     # whether value_selected is the local max value
@@ -372,10 +401,10 @@ class NormalModeProcess(object):
         self.sig_integrate = np.asarray(self.sig_integrate)
 
         # do CFAR on range doppler map
-        self.__range_cfar_os__()
+        self.__range_cfar__()
 
         if self.res_range_cfar['n_obj'] > 0:
-            self.__doppler_cfar_os_cyclicity__()
+            self.__doppler_cfar_cyclicity__()
 
             n_obj = self.res_doppler_cfar['n_obj']
 
@@ -819,8 +848,7 @@ class NormalModeProcess(object):
             sig = sig * np.expand_dims(np.expand_dims(cor_vec, axis=1), axis=0)
 
         sig_space = np.zeros(
-            (self.rangeFFT_size, self.dopplerFFT_size, self.virtual_array_azimuth.max() + 1,
-             self.virtual_array_elevation.max() + 1),
+            (self.rangeFFT_size, self.dopplerFFT_size, self.virtual_array_azimuth.max() + 1, self.virtual_array_elevation.max() + 1),
             dtype=sig.dtype
         )
         sig_space_index0 = self.virtual_array_noredundant[:, 0]
@@ -832,8 +860,7 @@ class NormalModeProcess(object):
         sig_space[:, :, sig_space_index0, sig_space_index1] = sig[:, :, sig_index0, sig_index1]
 
         sig_space_azimuthFFT = np.fft.fftshift(np.fft.fft(sig_space, n=self.azimuthFFT_size, axis=2), axes=2)
-        sig_space_elevationFFT = np.fft.fftshift(np.fft.fft(sig_space_azimuthFFT, n=self.elevationFFT_size, axis=3),
-                                                 axes=3)
+        sig_space_elevationFFT = np.fft.fftshift(np.fft.fft(sig_space_azimuthFFT, n=self.elevationFFT_size, axis=3), axes=3)
         heatmap4D = np.abs(sig_space_elevationFFT)
         heatmap4D = np.asnumpy(heatmap4D)
 
