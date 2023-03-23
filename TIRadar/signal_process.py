@@ -48,13 +48,16 @@ class NormalModeProcess(object):
 
         self.scale_factor = np.array([0.2500, 0.1250, 0.0625, 0.0312, 0.0156, 0.0078, 0.0039, 0.0020])
 
+        self.doa_fov_azim = [-80, 80]
+        self.doa_fov_elev = [-20, 20]
+
     def __timer__(self, fn):
         start_time = time.time()
         fn()
         end_time = time.time()
         print('{}() function consume: {:.3f} s'.format(fn.__name__, end_time - start_time))
 
-    def run(self, generate_pcd, generate_heatmapBEV, generate_heatmap4D, cfar_type='CASO'):
+    def run(self, generate_pcd, generate_heatmapBEV, generate_heatmap4D, cfar_type='CAOS'):
         self.generate_pcd = generate_pcd
         self.generate_heatmapBEV = generate_heatmapBEV
         self.generate_heatmap4D = generate_heatmap4D
@@ -94,13 +97,13 @@ class NormalModeProcess(object):
     def get_doppler_bins(self):
         return self.doppler_bins
 
-    def get_azimuth_bins(self, unit_degree=True):
+    def get_est_azimuth_bins(self, unit_degree=True):
         if unit_degree:
             return np.arcsin(self.azimuth_bins / 2 / np.pi / self.doa_unitDis) / np.pi * 180
         else:
             return np.arcsin(self.azimuth_bins / 2 / np.pi / self.doa_unitDis)
 
-    def get_elevation_bins(self, unit_degree=True):
+    def get_est_elevation_bins(self, unit_degree=True):
         if unit_degree:
             return np.arcsin(self.elevation_bins / 2 / np.pi / self.doa_unitDis) / np.pi * 180
         else:
@@ -656,8 +659,6 @@ class NormalModeProcess(object):
     def __DOA_beamformingFFT_2D__(self, sig):
         sidelobeLevel_dB_azim = 1
         sidelobeLevel_dB_elev = 0
-        doa_fov_azim = [-70, 70]
-        doa_fov_elev = [-20, 20]
 
         data_space = self.__single_obj_signal_space_mapping__(sig)
         data_azimuthFFT = np.fft.fftshift(np.fft.fft(data_space, n=self.azimuthFFT_size, axis=0), axes=0)
@@ -677,7 +678,8 @@ class NormalModeProcess(object):
             for j in range(len(peak_loc_elev)):
                 est_azimuth = np.arcsin(self.azimuth_bins[peak_loc_azim[i]] / 2 / np.pi / self.doa_unitDis) / np.pi * 180
                 est_elevation = np.arcsin(self.elevation_bins[peak_loc_elev[j]] / 2 / np.pi / self.doa_unitDis) / np.pi * 180
-                if est_azimuth >= doa_fov_azim[0] and est_azimuth <= doa_fov_azim[1] and est_elevation >= doa_fov_elev[0] and est_elevation <= doa_fov_elev[1]:
+                if self.doa_fov_azim[0] <= est_azimuth <= self.doa_fov_azim[1] and \
+                        self.doa_fov_elev[0] <= est_elevation <= self.doa_fov_elev[1]:
                     n_obj += 1
                     azimuth_obj.append(est_azimuth)
                     elevation_obj.append(est_elevation)
