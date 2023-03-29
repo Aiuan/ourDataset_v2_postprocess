@@ -22,17 +22,14 @@ def read_workbook(wb_path, sheetIndex=0):
     df = pd.DataFrame(data, columns=cols)
     return df
 
-def main():
-    info_path = '/mnt/Dataset/ourDataset_v2_group_infomation.xlsx'
-    label_per_frames = 5
-    dataset_v2_path = '/mnt/Dataset/ourDataset_v2'
-    output_path = '/mnt/Dataset/ourDataset_v2_label'
+def add_normalmode_group_to_label(info_path, dataset_v2_path, output_path, label_per_frames=None):
 
     if not os.path.exists(output_path):
         os.mkdir(output_path)
         log_GREEN('Create {}'.format(output_path))
 
     df_info = read_workbook(info_path)
+    assert (label_per_frames is not None) or ('num_frames_per_label' in df_info.columns.values.tolist())
 
     keys_dict = dict()
     for key in df_info.columns.values.tolist():
@@ -43,10 +40,15 @@ def main():
 
     # calculate number of frame to label
     df_info['num_frames'] = df_info[keys_dict['group_name']].str.split('_', expand=True)[3].str.replace('frames', '').astype('int')
-    df_info['num_frames_to_label'] = 1 + np.floor(df_info['num_frames'].values * 1.0 / label_per_frames).astype('int')
-    df_info['idx_frame_label'] = [np.arange(0, num_frames, label_per_frames) for num_frames in df_info['num_frames'].values]
+    if label_per_frames is not None:
+        df_info['idx_frame_label'] = [np.arange(0, df_info['num_frames'][i], label_per_frames) for i in range(df_info.shape[0])]
+    else:
+        df_info['idx_frame_label'] = [np.arange(0, df_info['num_frames'][i], df_info['num_frames_per_label'][i]) for i in range(df_info.shape[0])]
+    df_info['num_frames_to_label'] = [len(df_info['idx_frame_label'][i]) for i in range(df_info.shape[0])]
 
-    log_BLUE('Need to label {} frames'.format(df_info['num_frames_to_label'].values.sum()))
+
+    num_frames_to_label = df_info[df_info[keys_dict['need_to_label']]]['num_frames_to_label'].values.sum()
+    log_BLUE('Need to label {} frames'.format(num_frames_to_label))
 
     cnt_groups_label = 0
     for i in range(df_info.shape[0]):
@@ -86,8 +88,54 @@ def main():
                 )
             )
 
+def add_mixmode_group_to_label(dataset_v2_path, output_path):
 
-    log('done')
+    if not os.path.exists(output_path):
+        os.mkdir(output_path)
+        log_GREEN('Create {}'.format(output_path))
+
+    group_foldernames = os.listdir(dataset_v2_path)
+    group_foldernames.sort()
+    for i in range(len(group_foldernames)):
+        group_foldername = group_foldernames[i]
+        if 'mixmode' in group_foldername:
+            log('=' * 100)
+
+            src_path = os.path.join(dataset_v2_path, group_foldername)
+            dst_path = os.path.join(output_path, group_foldername)
+            try:
+                os.remove(dst_path)
+                log_YELLOW('Remove {}'.format(dst_path))
+            except:
+                pass
+            os.symlink(src_path, dst_path)
+
+            log_GREEN('Link {}'.format(group_foldername))
+
+def add_normalmode_per_5frames():
+    info_path = '/mnt/Dataset/ourDataset_v2_group_infomation.xlsx'
+    dataset_v2_path = '/mnt/Dataset/ourDataset_v2'
+    output_path = '/mnt/Dataset/ourDataset_v2_label'
+    add_normalmode_group_to_label(info_path, dataset_v2_path, output_path, label_per_frames=5)
+
+def add_mixmode():
+    dataset_v2_path = '/mnt/Dataset/ourDataset_v2'
+    output_path = '/mnt/Dataset/ourDataset_v2_label'
+    add_mixmode_group_to_label(dataset_v2_path, output_path)
+
+def add_group_for_tracking():
+    info_path = '/mnt/Dataset/ourDataset_v2_group_infomation_for_tracking.xlsx'
+    dataset_v2_path = '/mnt/Dataset/ourDataset_v2'
+    output_path = '/mnt/Dataset/ourDataset_v2_label'
+    add_normalmode_group_to_label(info_path, dataset_v2_path, output_path)
+
+def main():
+    add_normalmode_per_5frames()
+
+    add_mixmode()
+
+    add_group_for_tracking()
+
 
 if __name__ == '__main__':
     main()
