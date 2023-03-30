@@ -115,8 +115,25 @@ class NormalModeProcess(object):
     def get_heatmapBEV(self):
         return self.heatmapBEV
 
-    def get_heatmap4D(self):
-        return self.heatmap4D
+    def get_heatmap4D(self, in_fov):
+        if in_fov and self.heatmap4D is not None:
+            mask_azim = np.logical_and(
+                self.heatmap4D['est_azimuth_bins'] >= self.doa_fov_azim[0],
+                self.heatmap4D['est_azimuth_bins'] <= self.doa_fov_azim[1],
+            )
+            mask_elev = np.logical_and(
+                self.heatmap4D['est_elevation_bins'] >= self.doa_fov_elev[0],
+                self.heatmap4D['est_elevation_bins'] <= self.doa_fov_elev[1],
+            )
+            heatmap4D_infov = {
+                'heatmap4D': self.heatmap4D['heatmap4D'][:, :, mask_azim, :][:, :, :, mask_elev],
+                'range_bins': self.heatmap4D['range_bins'],
+                'est_azimuth_bins': self.heatmap4D['est_azimuth_bins'][mask_azim],
+                'est_elevation_bins': self.heatmap4D['est_elevation_bins'][mask_elev]
+            }
+            return heatmap4D_infov
+        else:
+            return self.heatmap4D
 
     def __calibrate_rawdata__(self):
         adc_sample_rate = self.infos['digOutSampleRate_ksps'] * 1e3
@@ -788,7 +805,7 @@ class NormalModeProcess(object):
             'noise': noise
         }
 
-    def __generate_heatmapBEV__(self, doppler_correction=False):
+    def __generate_heatmapBEV__(self, doppler_correction=True):
         sig = self.data_dopplerFFT
 
         if doppler_correction:
@@ -838,7 +855,7 @@ class NormalModeProcess(object):
             'y': y
         }
 
-    def __generate_heatmap4D__(self, doppler_correction=False):
+    def __generate_heatmap4D__(self, doppler_correction=True):
         sig = self.data_dopplerFFT
 
         if doppler_correction:
@@ -861,23 +878,29 @@ class NormalModeProcess(object):
             [np.argwhere(self.tx_id_transfer_order == i_tx)[0][0] for i_tx in self.virtual_array_noredundant[:, 3]])
         sig_space[:, :, sig_space_index0, sig_space_index1] = sig[:, :, sig_index0, sig_index1]
 
-        sig_space_azimuthFFT = np.fft.fftshift(np.fft.fft(sig_space, n=self.azimuthFFT_size, axis=2), axes=2)
-        sig_space_elevationFFT = np.fft.fftshift(np.fft.fft(sig_space_azimuthFFT, n=self.elevationFFT_size, axis=3), axes=3)
-        heatmap4D = np.abs(sig_space_elevationFFT)
-        heatmap4D = np.asnumpy(heatmap4D)
+        sig_space_dynamic = sig_space[:, np.arange(self.dopplerFFT_size) != self.dopplerFFT_size // 2, :, :].sum(axis=1)
+        sig_space_dynamic_azimuthFFT = np.fft.fftshift(np.fft.fft(sig_space_dynamic, n=self.azimuthFFT_size, axis=1), axes=1)
+        sig_space_dynamic_elevationFFT = np.fft.fftshift(np.fft.fft(sig_space_dynamic_azimuthFFT, n=self.elevationFFT_size, axis=2), axes=2)
 
-        r = self.range_bins
-        azi = np.arcsin(self.azimuth_bins / 2 / np.pi / self.doa_unitDis) / np.pi * 180
-        ele = np.arcsin(self.elevation_bins / 2 / np.pi / self.doa_unitDis) / np.pi * 180
-        x = r * np.cos(ele / 180 * np.pi) * np.sin(azi / 180 * np.pi)
-        y = r * np.cos(ele / 180 * np.pi) * np.cos(azi / 180 * np.pi)
-        z = r * np.sin(ele / 180 * np.pi)
-        doppler = self.doppler_bins
+        sig_space_static = sig_space[:, self.dopplerFFT_size // 2, :, :]
+        sig_space_static_azimuthFFT = np.fft.fftshift(np.fft.fft(sig_space_static, n=self.azimuthFFT_size, axis=1), axes=1)
+        sig_space_static_elevationFFT = np.fft.fftshift(np.fft.fft(sig_space_static_azimuthFFT, n=self.elevationFFT_size, axis=2), axes=2)
+
+        heatmap4D = np.stack(
+            (
+                np.abs(sig_space_dynamic_elevationFFT),
+                np.abs(sig_space_static_elevationFFT)
+            ),
+            axis=1
+        )
+
+        range_bins = self.get_range_bins()
+        est_azimuth_bins = self.get_est_azimuth_bins()
+        est_elevation_bins = self.get_est_elevation_bins()
 
         self.heatmap4D = {
             'heatmap4D': heatmap4D,
-            'x': x,
-            'y': y,
-            'z': z,
-            'doppler': doppler
+            'range_bins': range_bins,
+            'est_azimuth_bins': est_azimuth_bins,
+            'est_elevation_bins': est_elevation_bins
         }
