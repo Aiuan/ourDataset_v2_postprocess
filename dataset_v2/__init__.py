@@ -8,20 +8,26 @@ import cv2
 import pandas as pd
 import scipy.io as scio
 
+
 def log(text):
     print(text)
+
 
 def log_BLUE(text):
     print('\033[0;34;40m{}\033[0m'.format(text))
 
+
 def log_YELLOW(text):
     print('\033[0;33;40m{}\033[0m'.format(text))
+
 
 def log_GREEN(text):
     print('\033[0;32;40m{}\033[0m'.format(text))
 
+
 def log_RED(text):
     print('\033[0;31;40m{}\033[0m'.format(text))
+
 
 class GroupFolder(object):
     def __init__(self, path_group_folder):
@@ -36,6 +42,7 @@ class GroupFolder(object):
     def __getitem__(self, idx):
         path_frame_folder = os.path.join(self.path_group_folder, self.names_frame_folder[idx])
         return FrameFolder(path_frame_folder)
+
 
 class FrameFolder(object):
     def __init__(self, path_frame_folder):
@@ -63,16 +70,19 @@ def load_IRayCamera_png(path):
     data = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     return data
 
+
 def load_LeopardCamera_png(path):
     data = cv2.imread(path)
     # BGR -> RGB
     data = cv2.cvtColor(data, cv2.COLOR_BGR2RGB)
     return data
 
+
 def load_json(path):
     with open(path, "r") as f:
         data = json.load(f)
     return data
+
 
 def load_VelodyneLidar_pcd(path):
     with open(path, "r") as f:
@@ -100,6 +110,18 @@ def load_VelodyneLidar_pcd(path):
     }
     return res
 
+def load_pcd(path, pcd_sensor):
+    if pcd_sensor == 'VelodyneLidar':
+        return load_VelodyneLidar_pcd(path)
+    elif pcd_sensor == 'OCULiiRadar':
+        return load_OCULiiRadar_pcd(path)
+    elif pcd_sensor == 'TIRadar':
+        return load_TIRadar_pcd(path)
+    else:
+        log_RED("pcd_sensor not in ['VelodyneLidar', 'OCULiiRadar', 'TIRadar']")
+        return None
+
+
 def load_OCULiiRadar_pcd(path):
     with open(path, "r") as f:
         data = f.readlines()
@@ -124,6 +146,7 @@ def load_OCULiiRadar_pcd(path):
     }
     return res
 
+
 def load_TIRadar_adcdata(path):
     data = np.load(path, allow_pickle=True)
 
@@ -133,6 +156,7 @@ def load_TIRadar_adcdata(path):
         'mode_infos': data['mode_infos'][()]
     }
     return res
+
 
 def load_TIRadar_calibmat(path):
     data = scio.loadmat(path)
@@ -157,6 +181,7 @@ def load_TIRadar_calibmat(path):
 
     return res
 
+
 def load_TIRadar_heatmapBEV(path):
     data = np.load(path, allow_pickle=True)
 
@@ -167,6 +192,7 @@ def load_TIRadar_heatmapBEV(path):
         'heatmapBEV_dynamic': data['heatmapBEV_dynamic']
     }
     return res
+
 
 def load_TIRadar_pcd(path):
     with open(path, "r") as f:
@@ -196,9 +222,11 @@ def load_TIRadar_pcd(path):
     }
     return res
 
+
 def unix2local(unix_ts_str):
     # unix_timestamp_str --> local_timestamp_str
-    return '{}.{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(unix_ts_str))), unix_ts_str.split('.')[-1])
+    return '{}.{}'.format(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(float(unix_ts_str))),
+                          unix_ts_str.split('.')[-1])
 
 def pcd_in_zone(pcd_dict, xlim=[-np.inf, np.inf], ylim=[-np.inf, np.inf], zlim=[-np.inf, np.inf], return_type='np_array'):
     assert 'x' in pcd_dict.keys()
@@ -233,17 +261,51 @@ def pcd_in_zone(pcd_dict, xlim=[-np.inf, np.inf], ylim=[-np.inf, np.inf], zlim=[
 
     return res
 
-def pcd_in_range(pcd_dict, rlim, return_type='np_array'):
+def rectangular2polar(x, y, z):
+    '''
+        x: right, y: front, z: up
+    '''
+    r = np.sqrt(np.power(x, 2) + np.power(y, 2) + np.power(z, 2))
+
+    # elevation (-90, 90)
+    # elev = 0, y+
+    # elev = -90, z-
+    # elev = 90, z+
+    sin_elev = z / r
+    elev = np.arcsin(sin_elev) / np.pi * 180
+
+    # azimuth (-180, 180]
+    # azim = 0, y +
+    # azim = 90, x +
+    # azim = -90, x -
+    # azim = 180, y -
+    sin_azim = x / r / np.cos(elev / 180 * np.pi)
+    cos_azim = y / r / np.cos(elev / 180 * np.pi)
+    azim = np.arcsin(sin_azim) / np.pi * 180
+    mask = (cos_azim < 0)
+    azim[mask] = azim[mask] / np.abs(azim[mask]) * (180 - np.abs(azim[mask]))
+
+    return azim, elev, r
+
+def pcd_in_polar_zone(pcd_dict, azimlim=[-np.inf, np.inf], elevlim=[-np.inf, np.inf], rlim=[-np.inf, np.inf], return_type='np_array', add_aer=False):
     assert 'x' in pcd_dict.keys()
     assert 'y' in pcd_dict.keys()
     assert 'z' in pcd_dict.keys()
     assert return_type == 'np_array' or return_type == 'dict'
 
-    r = np.sqrt(
-        np.power(pcd_dict['x'], 2) + np.power(pcd_dict['y'], 2) + np.power(pcd_dict['z'], 2)
-    )
+    azim, elev, r = rectangular2polar(pcd_dict['x'], pcd_dict['y'], pcd_dict['z'])
+    if add_aer:
+        pcd_dict['azimuth'] = azim
+        pcd_dict['elevation'] = elev
+        pcd_dict['range'] = r
 
-    mask = r <= rlim
+    mask_azim = np.logical_and(azim >= azimlim[0], azim <= azimlim[1])
+
+    mask_elev = np.logical_and(elev >= elevlim[0], elev <= elevlim[1])
+
+    mask_r = np.logical_and(r >= rlim[0], r <= rlim[1])
+
+    mask = np.logical_and(np.logical_and(mask_azim, mask_elev), mask_r)
 
     if return_type == 'np_array':
         res = np.array(list(pcd_dict.values())).T
@@ -255,18 +317,21 @@ def pcd_in_range(pcd_dict, rlim, return_type='np_array'):
 
     return res
 
+
 def undistort_image(image, intrinsic, radial_distortion, tangential_distortion):
     k1, k2, k3 = radial_distortion
     p1, p2 = tangential_distortion
 
-    image_undistort = cv2.undistort(image, intrinsic, np.array([k1, k2, p1, p2, k3]))
+    image_undistort = cv2.undistort(image, np.array(intrinsic), np.array([k1, k2, p1, p2, k3]))
 
     return image_undistort
+
 
 def save_dict_as_json(json_path, dict_data):
     data = json.dumps(dict_data, sort_keys=True, indent=4)
     with open(json_path, 'w', newline='\n') as f:
         f.write(data)
+
 
 class Group(object):
     def __init__(self, root):
@@ -311,6 +376,7 @@ class Group(object):
         route = pd.DataFrame(route)
         return route
 
+
 class Frame(object):
     def __init__(self, root):
         self.root = root
@@ -319,10 +385,12 @@ class Frame(object):
         self.IRayCamera_json_path = self.__find_and_check_path__(os.path.join(self.root, 'IRayCamera', '*.json'))
 
         self.LeopardCamera0_png_path = self.__find_and_check_path__(os.path.join(self.root, 'LeopardCamera0', '*.png'))
-        self.LeopardCamera0_json_path = self.__find_and_check_path__(os.path.join(self.root, 'LeopardCamera0', '*.json'))
+        self.LeopardCamera0_json_path = self.__find_and_check_path__(
+            os.path.join(self.root, 'LeopardCamera0', '*.json'))
 
         self.LeopardCamera1_png_path = self.__find_and_check_path__(os.path.join(self.root, 'LeopardCamera1', '*.png'))
-        self.LeopardCamera1_json_path = self.__find_and_check_path__(os.path.join(self.root, 'LeopardCamera1', '*.json'))
+        self.LeopardCamera1_json_path = self.__find_and_check_path__(
+            os.path.join(self.root, 'LeopardCamera1', '*.json'))
 
         self.MEMS_json_path = self.__find_and_check_path__(os.path.join(self.root, 'MEMS', '*.json'))
 
@@ -331,10 +399,11 @@ class Frame(object):
 
         self.TIRadar_adcdata_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.adcdata.npz'))
         self.TIRadar_pcd_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.pcd'))
-        self.TIRadar_heatmapBEV_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.heatmapBEV.npz'))
+        self.TIRadar_heatmapBEV_path = self.__find_and_check_path__(
+            os.path.join(self.root, 'TIRadar', '*.heatmapBEV.npz'))
         self.TIRadar_json_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.json'))
         self.TIRadar_calibmat_path = self.__find_and_check_path__(os.path.join(self.root, 'TIRadar', '*.mat'))
-        
+
         self.VelodyneLidar_pcd_path = self.__find_and_check_path__(os.path.join(self.root, 'VelodyneLidar', '*.pcd'))
         self.VelodyneLidar_json_path = self.__find_and_check_path__(os.path.join(self.root, 'VelodyneLidar', '*.json'))
 
@@ -374,10 +443,12 @@ class Frame(object):
         if sensor_data_name == 'VelodyneLidar_pcd' and self.VelodyneLidar_pcd_path is not None:
             return load_VelodyneLidar_pcd(self.VelodyneLidar_pcd_path)
 
-        if sensor_data_name.split('_')[1] == 'json' and self.__getattribute__('{}_path'.format(sensor_data_name)) is not None:
+        if sensor_data_name.split('_')[1] == 'json' and self.__getattribute__(
+                '{}_path'.format(sensor_data_name)) is not None:
             return load_json(self.__getattribute__('{}_path'.format(sensor_data_name)))
 
         return None
+
 
 def pcd_transform(pcd_dict, extrinsic):
     assert 'x' in pcd_dict.keys()
@@ -398,3 +469,78 @@ def pcd_transform(pcd_dict, extrinsic):
     pcd_dict['z'] = xyz1_new[2, :]
 
     return pcd_dict
+
+
+def pcd_projection(x, y, z, intrinsic, extrinsic):
+    n = x.shape[0]
+
+    xyz1 = np.stack((x, y, z, np.ones((n))))
+
+    projection_matrix = np.matmul(intrinsic, extrinsic[0:3, :])
+
+    UVZ = np.matmul(projection_matrix, xyz1)
+    uv1 = UVZ[0:2, :] / UVZ[2, :]
+
+    u = uv1[0, :].round()
+    v = uv1[1, :].round()
+
+    return u, v
+
+
+def pcd_in_image(pcd_dict, image_width, image_height, intrinsic, extrinsic, add_uv=False):
+    assert 'x' in pcd_dict.keys()
+    assert 'y' in pcd_dict.keys()
+    assert 'z' in pcd_dict.keys()
+
+    u, v = pcd_projection(pcd_dict['x'], pcd_dict['y'], pcd_dict['z'], intrinsic, extrinsic)
+    if add_uv:
+        pcd_dict['u'] = u
+        pcd_dict['v'] = v
+
+    mask_u = np.logical_and(
+        pcd_dict['u'] >= 0,
+        pcd_dict['u'] <= image_width
+    )
+
+    mask_v = np.logical_and(
+        pcd_dict['v'] >= 0,
+        pcd_dict['v'] <= image_height
+    )
+
+    mask = np.logical_and(mask_u, mask_v)
+
+    for key, value in pcd_dict.items():
+        pcd_dict[key] = value[mask]
+
+    return pcd_dict
+
+
+def save_dict_as_VelodyneLidar_pcd(pcd_path, pcd_dict):
+    pcd = pd.DataFrame({
+        'x': pcd_dict['x'].astype('float32'),
+        'y': pcd_dict['y'].astype('float32'),
+        'z': pcd_dict['z'].astype('float32'),
+        'intensity': pcd_dict['intensity'].astype('uint8'),
+        'idx_laser': pcd_dict['idx_laser'].astype('uint8'),
+        'unix_timestamp': pcd_dict['unix_timestamp'].astype('float64'),
+    })
+
+    pcd.to_csv(pcd_path, sep=' ', index=False, header=False)
+    with open(pcd_path, 'r') as f_pcd:
+        lines = f_pcd.readlines()
+
+    with open(pcd_path, 'w') as f_pcd:
+        f_pcd.write('VERSION .7\n')
+        f_pcd.write('FIELDS')
+        for col in pcd.columns.values:
+            f_pcd.write(' {}'.format(col))
+        f_pcd.write('\n')
+        f_pcd.write('SIZE 4 4 4 1 1 8\n')
+        f_pcd.write('TYPE F F F U U F\n')
+        f_pcd.write('COUNT 1 1 1 1 1 1\n')
+        f_pcd.write('WIDTH {}\n'.format(len(pcd)))
+        f_pcd.write('HEIGHT 1\n')
+        f_pcd.write('VIEWPOINT 0 0 0 1 0 0 0\n')
+        f_pcd.write('POINTS {}\n'.format(len(pcd)))
+        f_pcd.write('DATA ascii\n')
+        f_pcd.writelines(lines)
