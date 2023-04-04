@@ -294,10 +294,6 @@ def pcd_in_polar_zone(pcd_dict, azimlim=[-np.inf, np.inf], elevlim=[-np.inf, np.
     assert return_type == 'np_array' or return_type == 'dict'
 
     azim, elev, r = rectangular2polar(pcd_dict['x'], pcd_dict['y'], pcd_dict['z'])
-    if add_aer:
-        pcd_dict['azimuth'] = azim
-        pcd_dict['elevation'] = elev
-        pcd_dict['range'] = r
 
     mask_azim = np.logical_and(azim >= azimlim[0], azim <= azimlim[1])
 
@@ -310,10 +306,18 @@ def pcd_in_polar_zone(pcd_dict, azimlim=[-np.inf, np.inf], elevlim=[-np.inf, np.
     if return_type == 'np_array':
         res = np.array(list(pcd_dict.values())).T
         res = res[mask, :]
+
+        if add_aer:
+            res = np.hstack((res, np.stack((azim[mask], elev[mask], r[mask]), axis=1)))
     else:
         res = dict()
         for key, value in pcd_dict.items():
-            res[key] = pcd_dict[key][mask]
+            res[key] = value[mask]
+
+        if add_aer:
+            res['azimuth'] = azim[mask]
+            res['elevation'] = elev[mask]
+            res['range'] = r[mask]
 
     return res
 
@@ -464,11 +468,16 @@ def pcd_transform(pcd_dict, extrinsic):
 
     xyz1_new = np.matmul(extrinsic, xyz1)
 
-    pcd_dict['x'] = xyz1_new[0, :]
-    pcd_dict['y'] = xyz1_new[1, :]
-    pcd_dict['z'] = xyz1_new[2, :]
+    res = dict()
+    for key, value in pcd_dict.items():
+        if key in ['x', 'y', 'z']:
+            res['x'] = xyz1_new[0, :]
+            res['y'] = xyz1_new[1, :]
+            res['z'] = xyz1_new[2, :]
+        else:
+            res[key] = value
 
-    return pcd_dict
+    return res
 
 
 def pcd_projection(x, y, z, intrinsic, extrinsic):
@@ -487,32 +496,36 @@ def pcd_projection(x, y, z, intrinsic, extrinsic):
     return u, v
 
 
-def pcd_in_image(pcd_dict, image_width, image_height, intrinsic, extrinsic, add_uv=False):
+def pcd_in_image(pcd_dict, image_width, image_height, intrinsic, extrinsic, return_type='dict', add_uv=False):
     assert 'x' in pcd_dict.keys()
     assert 'y' in pcd_dict.keys()
     assert 'z' in pcd_dict.keys()
+    assert return_type == 'np_array' or return_type == 'dict'
 
     u, v = pcd_projection(pcd_dict['x'], pcd_dict['y'], pcd_dict['z'], intrinsic, extrinsic)
-    if add_uv:
-        pcd_dict['u'] = u
-        pcd_dict['v'] = v
 
-    mask_u = np.logical_and(
-        pcd_dict['u'] >= 0,
-        pcd_dict['u'] <= image_width
-    )
+    mask_u = np.logical_and(u >= 0, u < image_width)
 
-    mask_v = np.logical_and(
-        pcd_dict['v'] >= 0,
-        pcd_dict['v'] <= image_height
-    )
+    mask_v = np.logical_and(v >= 0, v < image_height)
 
     mask = np.logical_and(mask_u, mask_v)
 
-    for key, value in pcd_dict.items():
-        pcd_dict[key] = value[mask]
+    if return_type == 'np_array':
+        res = np.array(list(pcd_dict.values())).T
+        res = res[mask, :]
 
-    return pcd_dict
+        if add_uv:
+            res = np.hstack((res, np.stack((u[mask], v[mask]), axis=1)))
+    else:
+        res = dict()
+        for key, value in pcd_dict.items():
+            res[key] = value[mask]
+
+        if add_uv:
+            res['u'] = u[mask]
+            res['v'] = v[mask]
+
+    return res
 
 
 def save_dict_as_VelodyneLidar_pcd(pcd_path, pcd_dict):
