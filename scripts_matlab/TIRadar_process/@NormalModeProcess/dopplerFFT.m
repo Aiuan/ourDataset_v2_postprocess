@@ -3,7 +3,7 @@ function obj = dopplerFFT(obj)
 
     if obj.dopplerFFT_window_enable
         % use hanning window
-        window_coeff_vec = np.hanning(obj.dopplerFFT_size)';
+        window_coeff_vec = hanning(obj.dopplerFFT_size)';
         data_dopplerFFT = data_dopplerFFT .* window_coeff_vec;
     end
 

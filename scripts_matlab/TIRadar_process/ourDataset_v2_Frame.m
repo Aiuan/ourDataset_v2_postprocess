@@ -32,7 +32,31 @@ classdef ourDataset_v2_Frame
             ts_str = data_json.timestamp;
         end
 
+        function [image, ts_str] = get_LeopardCamera0_data(obj)
+            root_LeopardCamera0 = fullfile(obj.root, 'LeopardCamera0');
 
+            name_image_png = dir(fullfile(root_LeopardCamera0, '*.png')).name;
+            path_image_png = fullfile(root_LeopardCamera0, name_image_png);
+            image = imread(path_image_png);
+
+            name_json = dir(fullfile(root_LeopardCamera0, '*.json')).name;
+            path_json = fullfile(root_LeopardCamera0, name_json);
+            data_json = loadjson(path_json);
+            ts_str = data_json.timestamp;
+        end
+
+        function [pcd, ts_str] = get_VelodyneLidar_data(obj)
+            root_VelodyneLidar = fullfile(obj.root, 'VelodyneLidar');
+
+            name_pcd = dir(fullfile(root_VelodyneLidar, '*.pcd')).name;
+            path_pcd = fullfile(root_VelodyneLidar, name_pcd);
+            pcd = load_VelodyneLidar_pcd(path_pcd);
+
+            name_json = dir(fullfile(root_VelodyneLidar, '*.json')).name;
+            path_json = fullfile(root_VelodyneLidar, name_json);
+            data_json = loadjson(path_json);
+            ts_str = data_json.timestamp;
+        end
     end
 
 end

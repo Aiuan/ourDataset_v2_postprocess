@@ -63,6 +63,7 @@ classdef NormalModeProcess
         
         % doa
         res_doa;
+
     end
 
     methods
@@ -112,5 +113,7 @@ classdef NormalModeProcess
        obj = doa(obj);
 
        pcd = generate_pcd(obj);
+
+       heatmap_bev = generate_heatmap_bev(obj);
     end
 end
