@@ -17,7 +17,7 @@ def check_to_create_path(path):
 
 def main():
     root_dataset_to_label = '/mnt/Dataset/ourDataset_v2_label'
-    root_output = '/mnt/Dataset/data_to_label'
+    root_output = '/mnt/Dataset/data_for_SUSTechPOINTS'
     camera_list = ['LeopardCamera0', 'LeopardCamera1', 'IRayCamera']
     pcd_sensor = 'VelodyneLidar'
     r = 100
