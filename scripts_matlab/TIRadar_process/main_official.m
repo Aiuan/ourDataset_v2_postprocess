@@ -34,6 +34,8 @@ for idx_frame = 1:group.num_frames
     nmp = cfar_os(nmp);
 
     if ~isempty(nmp.res_doppler_cfar)
+        nmp = TDMA_phase_component(nmp);
+
         nmp = doa(nmp);
         if ~isempty(nmp.res_doa)
             pcd = generate_pcd(nmp);
