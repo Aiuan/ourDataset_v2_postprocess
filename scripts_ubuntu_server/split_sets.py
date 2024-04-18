@@ -122,8 +122,8 @@ def main():
         201219    舟山    夜晚
         201220    舟山    白天
         201221    舟山    白天
-        201223    舟山    夜晚
-        201224    舟山    白天
+        201223    烟台    夜晚
+        201224    烟台    白天
     '''
     groups_train, groups_valid, groups_test, cnt_frames_train, cnt_frames_valid, cnt_frames_test = split_sets(
         root_dataset=root_dataset,
